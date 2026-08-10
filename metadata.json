@@ -1,0 +1,8 @@
+{
+  "name": "Remix: Yoga \u0026 Shiatsu Reservas",
+  "description": "Plataforma de clases de Yoga y masajes Shiatsu japoneses con sistema interactivo de reserva de turnos.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
