@@ -1,0 +1,63 @@
+[
+  {
+    "id": "shiatsu-tradicional",
+    "name": "Sesión de Shiatsu Zen",
+    "description": "Terapia japonesa que utiliza la presión precisa de los pulgares, manos y codos sobre los puntos de acupuntura. Estimula la circulación energética del cuerpo, libera bloqueos físicos y tensión acumulada.",
+    "category": "shiatsu",
+    "duration": 60,
+    "price": 40000,
+    "intensity": "Restaurativa",
+    "benefits": [
+      "Fortalece el sistema inmunológico y equilibra el sistema nervioso",
+      "Estimula la circulación energética de todo el cuerpo",
+      "Ayuda a corregir contracturas posturales y alivia dolores de cabeza"
+    ]
+  },
+  {
+    "id": "shiatsu-hot-stones",
+    "name": "Sesión de Reiki",
+    "description": "Reiki es una terapia energética japonesa que utiliza la imposición de manos para canalizar la energía vital universal con el fin de promover bienestar y equilibrar cuerpo, mente y espíritu.",
+    "category": "reiki",
+    "duration": 60,
+    "price": 40000,
+    "intensity": "Suave",
+    "benefits": []
+  },
+  {
+    "id": "service-1785349638895-99",
+    "name": "Yoga - Presencial",
+    "description": "Trabajamos el equilibrio entre la pausa y el movimiento. Exploramos la permanencia y la observación a través de la energía Yin. También damos lugar a la naturaleza de la energía Yang, con diferentes estilos dinámicos, método Antropotécnica y elementos de Vinyasa.",
+    "category": "yoga",
+    "duration": 60,
+    "price": 0,
+    "priceYoga4": 30000,
+    "priceYoga8": 45000,
+    "priceYoga8to12": 45000,
+    "priceYoga12": 55000,
+    "intensity": "Equilibrio",
+    "highlightNote": "Práctica presencial • Cupos reducidos",
+    "benefits": [
+      "Reduce notablemente el estrés y la tensión mental",
+      "Mejora la flexibilidad corporal y el balance general",
+      "Fomenta la autorregulación física y mental"
+    ]
+  },
+  {
+    "id": "service-1785431664739-34",
+    "name": "Yoga - Online",
+    "description": "Secuencias cortas para aquellas personas que necesitan poder sostener un período mas corto de práctica, desde la comodidad del lugar donde estén. Ponemos el foco en la movilidad y estiramientos activos/pasivos.",
+    "category": "yoga",
+    "duration": 30,
+    "price": 0,
+    "priceYoga4": 22000,
+    "priceYoga8": 35000,
+    "priceYoga8to12": 35000,
+    "intensity": "Equilibrio",
+    "highlightNote": "Práctica online • Vía Zoom",
+    "benefits": [
+      "Reduce notablemente el estrés y la tensión mental",
+      "Mejora la flexibilidad corporal y el balance general",
+      "Fomenta la autorregulación física y mental"
+    ]
+  }
+]

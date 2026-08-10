@@ -1,0 +1,51 @@
+{
+  "entities": {
+    "carousel": {
+      "title": "Carousel 1 Slides",
+      "description": "Carousel 1 image slides stored in database",
+      "fields": {
+        "slides": { "type": "array", "description": "List of slide objects" },
+        "updatedAt": { "type": "string", "description": "ISO timestamp" }
+      }
+    },
+    "carousel2": {
+      "title": "Carousel 2 Slides",
+      "description": "Carousel 2 image slides stored in database",
+      "fields": {
+        "slides": { "type": "array", "description": "List of slide objects" },
+        "updatedAt": { "type": "string", "description": "ISO timestamp" }
+      }
+    },
+    "services": {
+      "title": "Yoga Services",
+      "description": "Yoga service cards and descriptions",
+      "fields": {
+        "services": { "type": "array", "description": "List of service objects" },
+        "updatedAt": { "type": "string", "description": "ISO timestamp" }
+      }
+    },
+    "blockedSlots": {
+      "title": "Blocked Slots",
+      "description": "Blocked date and time slots",
+      "fields": {
+        "slots": { "type": "array", "description": "List of blocked slot objects" },
+        "updatedAt": { "type": "string", "description": "ISO timestamp" }
+      }
+    },
+    "bookings": {
+      "title": "Bookings",
+      "description": "User class bookings",
+      "fields": {
+        "userName": { "type": "string" },
+        "userPhone": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "serviceId": { "type": "string" },
+        "serviceName": { "type": "string" },
+        "date": { "type": "string" },
+        "time": { "type": "string" },
+        "paymentStatus": { "type": "string" },
+        "createdAt": { "type": "string" }
+      }
+    }
+  }
+}
