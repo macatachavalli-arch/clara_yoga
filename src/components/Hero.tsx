@@ -103,7 +103,7 @@ export default function Hero({ onStartBooking, onExploreServices, onMyBookings }
             transition={{ duration: 0.6, delay: 0.15 }}
             className="font-serif text-4xl sm:text-5xl lg:text-6xl font-light tracking-tight text-stone-charcoal leading-[1.05]"
           >
-            Yoga & Shiatsu Zen
+            Yoga . Arte . Movimiento . Meditación
           </motion.h2>
 
           {/* Description */}
@@ -114,15 +114,8 @@ export default function Hero({ onStartBooking, onExploreServices, onMyBookings }
             className="mt-6 text-base sm:text-lg text-[#3c3129] font-serif font-light leading-relaxed space-y-4 max-w-2xl"
           >
             <p className="italic">
-              Yoga como medicina para la vida moderna. El objetivo es que puedas integrar cuerpo y mente en una práctica consciente y equilibrada. Desarrollar de manera progresiva un cuerpo fuerte y móvil, una herramienta para que recuperes tu centro y mejores tu bienestar.
-            </p>
-            <div className="flex items-center justify-center gap-2 py-1 text-[#867768]/60">
-              <span className="h-[1px] w-8 bg-[#867768]/30"></span>
-              <span className="text-[10px]">✦</span>
-              <span className="h-[1px] w-8 bg-[#867768]/30"></span>
-            </div>
-            <p className="italic">
-              De lo paulatino hacia lo profundo. El arte japonés de la sanación a través del tacto sutil. Shiatsu Zen es un encuentro entre personas, un masaje de digitopresión, rotaciones y estiramientos suaves, destinado a todas aquellas personas que deseen transitar una experiencia corporal profunda y restaurativa.
+              Yoga como medicina para la vida moderna.<br />
+              El objetivo es que puedas integrar cuerpo y mente en una práctica consciente y equilibrada. Desarrollar de manera progresiva un cuerpo fuerte y móvil, una herramienta para que recuperes tu centro y mejores tu bienestar.
             </p>
           </motion.div>
 

@@ -22,20 +22,27 @@ export default function ServicesPanel({ services, onSelectService }: ServicesPan
     <section id="services-section" className="py-20 bg-stone-sand border-b border-stone-borders scroll-mt-20">
       <div className="mx-auto max-w-7xl px-6 sm:px-8">
         
-        {/* Section Header */}
-        <div className="flex flex-col items-center justify-center text-center gap-6">
-          <div className="w-full">
-            <h2 className="font-serif text-[36px] italic font-light text-stone-charcoal mt-2 md:text-[36px] leading-tight">
-              Sesiones
-            </h2>
-          </div>
+        {/* Section Eyebrow */}
+        <div className="flex flex-col items-center justify-center text-center mb-2">
+          <span className="text-[11px] font-mono tracking-[0.25em] uppercase text-[#867768]">
+            Sesiones Individuales
+          </span>
         </div>
 
         {/* Services Grid Display */}
-        <div className="mt-16 grid gap-8 grid-cols-1 md:grid-cols-2 lg:grid-cols-2 max-w-4xl mx-auto">
+        <div className="mt-8 grid gap-8 grid-cols-1 md:grid-cols-2 max-w-4xl mx-auto items-start">
           {displayServices.map((service, index) => {
             const isYoga = service.category === 'yoga' || service.name.toLowerCase().includes('yoga');
             const isCombo = service.category === 'combo';
+
+            const nameLower = (service.name || '').toLowerCase();
+            const catLower = (service.category || '').toLowerCase();
+
+            const cardTitle = catLower === 'shiatsu' || nameLower.includes('shiatsu')
+              ? 'Shiatsu Zen'
+              : catLower === 'reiki' || nameLower.includes('reiki')
+              ? 'Reiki Usui'
+              : service.name;
 
             const hasP4 = Boolean(service.priceYoga4 && service.priceYoga4 > 0);
             const hasP8 = Boolean((service.priceYoga8 && service.priceYoga8 > 0) || (service.priceYoga8to12 && service.priceYoga8to12 > 0));
@@ -46,36 +53,54 @@ export default function ServicesPanel({ services, onSelectService }: ServicesPan
             const pLibreVal = service.priceYogaPaseLibre || service.priceYoga12;
 
             return (
-              <motion.div
-                key={service.id}
-                id={`service-card-${service.id}`}
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, delay: index * 0.05 }}
-                className={`relative flex flex-col justify-between bg-white p-6 shadow-none transition-all hover:border-stone-charcoal duration-300 rounded-[12px] border border-[#e5e1d8] ${
-                  isCombo 
-                    ? 'border-[#e5e1d8] bg-stone-sand/40' 
-                    : 'border-[#e5e1d8]'
-                }`}
-              >
+              <div key={service.id} className="flex flex-col items-center w-full">
+                {/* Main title aligned centrally with the card */}
+                <h2 className="font-serif text-[32px] sm:text-[36px] italic font-light text-stone-charcoal text-center mb-3">
+                  {cardTitle}
+                </h2>
+
+                {/* Subtitle / Description paragraph before card */}
+                <p className="font-serif font-light text-stone-600 text-[18px] leading-[29.75px] text-center mb-6 max-w-[350px] w-full px-2 italic">
+                  {cardTitle === 'Shiatsu Zen' ? (
+                    <>
+                      De lo paulatino hacia lo profundo.<br />
+                      Shiatsu Zen es un encuentro entre personas, un masaje de digitopresión, rotaciones y estiramientos suaves, para transitar una experiencia profunda y restaurativa.
+                    </>
+                  ) : cardTitle === 'Reiki Usui' ? (
+                    <>
+                      Canalización de energía vital universal mediante la imposición de manos. Una terapia energética orientada a disolver tensiones, calmar la mente y restablecer el equilibrio natural de todo tu ser. Reiki es amor, luz y transformación.
+                    </>
+                  ) : (
+                    <>
+                      Espacio dedicado a la autorregulación y el bienestar consciente. Prácticas y encuentros diseñados para profundizar en la conexión corporal y serenar la mente.
+                    </>
+                  )}
+                </p>
+
+                <motion.div
+                  id={`service-card-${service.id}`}
+                  initial={{ opacity: 0, y: 15 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.4, delay: index * 0.05 }}
+                  className={`relative flex flex-col justify-between bg-white p-6 shadow-none transition-all hover:border-stone-charcoal duration-300 rounded-[12px] border border-[#e5e1d8] w-full h-full ${
+                    isCombo 
+                      ? 'border-[#e5e1d8] bg-stone-sand/40' 
+                      : 'border-[#e5e1d8]'
+                  }`}
+                >
                 {/* Card Top Section info */}
                 <div>
-                  {/* 1. Title */}
-                  <h3 className="font-serif text-xl font-light text-stone-charcoal leading-snug">
-                    {service.name}
-                  </h3>
-
-                  {/* 2. Duration */}
+                  {/* Duration & Price */}
                   {isYoga ? (
                     Number(service.duration) > 0 && (
-                      <div className="mt-2.5 mb-3.5 flex items-center gap-1.5 text-xs font-mono text-stone-500 border-b border-stone-sand pb-2.5">
+                      <div className="mt-1 mb-3.5 flex items-center gap-1.5 text-xs font-mono text-stone-500 border-b border-stone-sand pb-2.5">
                         <Clock className="h-3.5 w-3.5 text-stone-400" />
                         <span className="font-sans text-stone-500">{service.duration} minutos por clase</span>
                       </div>
                     )
                   ) : (
                     (Number(service.duration) > 0 || (service.price && service.price > 0)) && (
-                      <div className="mt-2.5 mb-3.5 flex items-center gap-4 text-xs font-mono text-stone-500 border-b border-stone-sand pb-2.5">
+                      <div className="mt-1 mb-3.5 flex items-center gap-4 text-xs font-mono text-stone-500 border-b border-stone-sand pb-2.5">
                         {Number(service.duration) > 0 && (
                           <span className="flex items-center gap-1 font-sans text-stone-500">
                             <Clock className="h-3.5 w-3.5 text-stone-400" />
@@ -175,8 +200,8 @@ export default function ServicesPanel({ services, onSelectService }: ServicesPan
                     </a>
                   )}
                 </div>
-
               </motion.div>
+            </div>
             );
           })}
         </div>

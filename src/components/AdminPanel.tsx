@@ -613,20 +613,11 @@ export default function AdminPanel({
   return (
     <div id="admin-panel-container" className="mx-auto max-w-5xl px-4 py-12">
       
-      {/* Title & Close Header banner */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between pb-6 border-b border-stone-borders mb-8 gap-4">
-        <div className="text-center md:text-left">
-          <h2 className="font-serif text-3xl font-light text-stone-charcoal">
-            Panel de Gestión
-          </h2>
-          <p className="text-xs text-stone-400 font-light mt-1">
-            Administración de tarjetas.
-          </p>
-        </div>
-
+      {/* Top action bar: only Volver a la Web button */}
+      <div className="flex items-center justify-center pb-6 border-b border-stone-borders mb-8">
         <button
           onClick={onClose}
-          className="self-start md:self-auto flex items-center justify-center gap-1.5 border border-stone-borders hover:border-stone-charcoal hover:bg-stone-charcoal hover:text-stone-sand text-stone-600 font-bold text-[9px] uppercase tracking-widest px-4 py-2.5 transition-all duration-300 rounded-none cursor-pointer"
+          className="flex items-center justify-center gap-1.5 border border-stone-borders hover:border-stone-charcoal hover:bg-stone-charcoal hover:text-stone-sand text-stone-600 font-bold text-[9px] uppercase tracking-widest px-4 py-2.5 transition-all duration-300 rounded-none cursor-pointer"
         >
           <Undo2 className="h-3.5 w-3.5" />
           Volver a la Web
@@ -636,18 +627,14 @@ export default function AdminPanel({
       {/* 🔐 AUTHENTICATION FORM OVERLAY if not authenticated */}
       {!isAuthenticated ? (
         <div className="max-w-md mx-auto bg-white border border-stone-borders p-8 shadow-none mt-12">
-          <div className="flex flex-col items-center text-center space-y-4 mb-6">
+          <div className="flex flex-col items-center text-center mb-6">
             <div className="bg-stone-sand rounded-none p-4 border border-stone-borders">
               <Lock className="h-6 w-6 text-stone-gold" />
             </div>
-            <h3 className="font-serif text-xl font-light text-stone-charcoal">Ingreso Seguro</h3>
           </div>
 
           <form onSubmit={handleLoginSubmit} className="space-y-4">
             <div>
-              <label className="block text-[9px] font-bold uppercase tracking-[0.15em] text-stone-charcoal mb-2">
-                Clave de Administración
-              </label>
               <div className="relative">
                 <input
                   type="password"
