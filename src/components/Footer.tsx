@@ -30,7 +30,7 @@ export default function Footer({ onAdminClick }: FooterProps) {
             </button>
           )}
           <a 
-            href="https://www.instagram.com/clara.ch.yoga/" 
+            href="https://www.instagram.com/mariaclara.yoga/" 
             target="_blank" 
             rel="noopener noreferrer" 
             className="text-stone-500 hover:text-stone-charcoal transition-colors block"
