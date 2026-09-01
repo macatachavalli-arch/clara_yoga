@@ -24,7 +24,7 @@ export default function Footer({ onAdminClick }: FooterProps) {
               onClick={onAdminClick}
               title="Panel de gestión"
               aria-label="Panel de gestión"
-              className="text-[#d5d0cc] hover:text-stone-500 transition-colors cursor-pointer p-1"
+              className="hidden md:inline-flex text-[#d5d0cc] hover:text-stone-500 transition-colors cursor-pointer p-1"
             >
               <Lock className="h-3.5 w-3.5" />
             </button>
@@ -33,7 +33,8 @@ export default function Footer({ onAdminClick }: FooterProps) {
             href="https://www.instagram.com/mariaclara.yoga/" 
             target="_blank" 
             rel="noopener noreferrer" 
-            className="text-stone-500 hover:text-stone-charcoal transition-colors block"
+            aria-label="Instagram @mariaclara.yoga"
+            className="text-stone-500 hover:text-stone-charcoal transition-colors inline-flex items-center p-1"
           >
             <Instagram className="h-4.5 w-4.5" />
           </a>

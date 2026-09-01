@@ -179,6 +179,71 @@ export default function App() {
     updateBookingCount();
   }, [refreshFlag]);
 
+  // Clean absolute URL anchor handler (e.g. https://.../#yoga, https://.../#reservar)
+  useEffect(() => {
+    const handleHashNavigation = () => {
+      const rawHash = window.location.hash.replace(/^#/, '').toLowerCase().trim();
+      if (!rawHash) return;
+
+      if (rawHash === 'reservar' || rawHash === 'book' || rawHash === 'reserva') {
+        setActiveTab('book');
+        const targetUrl = `${window.location.pathname}#reservar`;
+        if (window.location.hash !== '#reservar') {
+          window.history.replaceState(null, '', targetUrl);
+        }
+      } else if (rawHash === 'misturnos' || rawHash === 'turnos' || rawHash === 'my-bookings') {
+        setActiveTab('my-bookings');
+        const targetUrl = `${window.location.pathname}#misturnos`;
+        if (window.location.hash !== '#misturnos') {
+          window.history.replaceState(null, '', targetUrl);
+        }
+      } else {
+        setActiveTab('home');
+        const aliasMap: Record<string, string> = {
+          'yoga-explainer': 'yoga',
+          'estilos-practica': 'estilos',
+          'horarios-section': 'horarios',
+          'services-section': 'terapias',
+          'servicios': 'terapias',
+          'therapeutic-team-section': 'bio',
+          'team': 'bio',
+          'contact-section': 'contacto',
+          'hero-section': 'inicio',
+          'home': 'inicio',
+        };
+        const cleanHash = aliasMap[rawHash] || rawHash;
+        const targetUrl = `${window.location.pathname}#${cleanHash}`;
+        window.history.replaceState(null, '', targetUrl);
+
+        setTimeout(() => {
+          const el = document.getElementById(cleanHash) || document.getElementById(rawHash);
+          if (el) {
+            const navHeader = document.getElementById('desktop-floating-nav');
+            const navHeight = (navHeader && window.innerWidth >= 768) ? navHeader.getBoundingClientRect().height : 0;
+            const targetScrollTop = el.getBoundingClientRect().top + window.scrollY - navHeight;
+            window.scrollTo({ top: Math.max(0, targetScrollTop), behavior: 'smooth' });
+          }
+        }, 200);
+      }
+    };
+
+    handleHashNavigation();
+    window.addEventListener('hashchange', handleHashNavigation);
+    return () => window.removeEventListener('hashchange', handleHashNavigation);
+  }, []);
+
+  // Update URL hash when tab changes directly
+  const handleTabChange = (tab: 'home' | 'book' | 'my-bookings') => {
+    setActiveTab(tab);
+    if (tab === 'book') {
+      window.history.replaceState(null, '', `${window.location.pathname}#reservar`);
+    } else if (tab === 'my-bookings') {
+      window.history.replaceState(null, '', `${window.location.pathname}#misturnos`);
+    } else if (tab === 'home') {
+      window.history.replaceState(null, '', `${window.location.pathname}#inicio`);
+    }
+  };
+
   // Handle direct booking click on a particular service from catalog
   const handleSelectServiceDirectly = (serviceId: string) => {
     setPreselectedServiceId(serviceId);
@@ -197,14 +262,17 @@ export default function App() {
   };
 
   const handleScrollToServices = () => {
+    window.history.replaceState(null, '', `${window.location.pathname}#terapias`);
     if (activeTab !== 'home') {
       setActiveTab('home');
       // Wait for tab switch rendering before scrolling
       setTimeout(() => {
-        document.getElementById('services-section')?.scrollIntoView({ behavior: 'smooth' });
+        const el = document.getElementById('terapias') || document.getElementById('services-section');
+        el?.scrollIntoView({ behavior: 'smooth' });
       }, 100);
     } else {
-      document.getElementById('services-section')?.scrollIntoView({ behavior: 'smooth' });
+      const el = document.getElementById('terapias') || document.getElementById('services-section');
+      el?.scrollIntoView({ behavior: 'smooth' });
     }
   };
 
@@ -228,7 +296,7 @@ export default function App() {
           {/* Desktop & Mobile Navigation (Desktop Header above Hero + Mobile Bar) */}
           <FloatingNav 
             activeTab={activeTab}
-            setActiveTab={setActiveTab}
+            setActiveTab={handleTabChange}
           />
 
           {/* Main Dynamic Workspace body */}
@@ -246,7 +314,7 @@ export default function App() {
                   <Hero 
                     onStartBooking={handleStartPlainBooking}
                     onExploreServices={handleScrollToServices}
-                    onMyBookings={() => setActiveTab('my-bookings')}
+                    onMyBookings={() => handleTabChange('my-bookings')}
                   />
                   
                   {/* Screen 2: Yoga (Introducción y Método con Carrusel de 3 fotos) */}
@@ -265,7 +333,7 @@ export default function App() {
                   <TherapeuticTeam />
 
                   {/* Screen 7: Contacto */}
-                  <ContactSection />
+                  <ContactSection onAdminClick={() => setIsAdminActive(true)} />
                 </motion.div>
               )}
 
@@ -282,8 +350,8 @@ export default function App() {
                     services={services}
                     preselectedServiceId={preselectedServiceId}
                     onBookingSuccess={handleBookingSuccess}
-                    onViewReservations={() => setActiveTab('my-bookings')}
-                    onGoHome={() => setActiveTab('home')}
+                    onViewReservations={() => handleTabChange('my-bookings')}
+                    onGoHome={() => handleTabChange('home')}
                     blockedSlots={blockedSlots}
                     bookings={bookings}
                   />
@@ -302,7 +370,7 @@ export default function App() {
                   <MyReservations 
                     services={services}
                     onStartBooking={handleStartPlainBooking}
-                    onGoHome={() => setActiveTab('home')}
+                    onGoHome={() => handleTabChange('home')}
                     refreshFlag={refreshFlag}
                   />
                 </motion.div>
@@ -310,10 +378,12 @@ export default function App() {
             </AnimatePresence>
           </main>
 
-          {/* Structured Footer / FAQ Panel */}
-          <div className="pb-16 md:pb-0">
-            <Footer onAdminClick={() => setIsAdminActive(true)} />
-          </div>
+          {/* Structured Footer for non-home subviews */}
+          {activeTab !== 'home' && (
+            <div className="pb-16 md:pb-0">
+              <Footer onAdminClick={() => setIsAdminActive(true)} />
+            </div>
+          )}
         </>
       )}
 

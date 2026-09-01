@@ -10,9 +10,10 @@ export default function TherapeuticTeam() {
 
   return (
     <section 
-      id="therapeutic-team-section" 
-      className="bg-stone-sand scroll-mt-[48px] md:scroll-mt-[52px] flex flex-col justify-start w-full overflow-hidden"
+      id="bio" 
+      className="bg-stone-sand scroll-mt-[48px] md:scroll-mt-[52px] flex flex-col justify-start w-full overflow-hidden relative"
     >
+      <div id="therapeutic-team-section" className="sr-only" />
       {/* Full-width Top Banner Image (Bio.jpeg) without cropping */}
       <div className="w-full bg-[#FDFCF8]">
         <img

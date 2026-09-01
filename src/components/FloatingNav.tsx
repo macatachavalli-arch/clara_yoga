@@ -91,13 +91,26 @@ interface FloatingNavProps {
 }
 
 export const SECTIONS = [
-  { id: 'yoga-explainer', label: 'Yoga', shortLabel: 'Yoga', icon: LotusIcon },
-  { id: 'estilos-practica', label: 'Estilos', shortLabel: 'Estilos', icon: YogaWarriorIcon },
-  { id: 'horarios-section', label: 'Horarios', shortLabel: 'Horarios', icon: Clock },
-  { id: 'services-section', label: 'Terapias', shortLabel: 'Terapias', icon: SimpleSpiralIcon },
-  { id: 'therapeutic-team-section', label: 'Bío', shortLabel: 'Bío', icon: User },
-  { id: 'contact-section', label: 'Contacto', shortLabel: 'Contacto', icon: Mail },
+  { id: 'yoga', legacyId: 'yoga-explainer', label: 'Yoga', shortLabel: 'Yoga', icon: LotusIcon },
+  { id: 'estilos', legacyId: 'estilos-practica', label: 'Estilos', shortLabel: 'Estilos', icon: YogaWarriorIcon },
+  { id: 'horarios', legacyId: 'horarios-section', label: 'Horarios', shortLabel: 'Horarios', icon: Clock },
+  { id: 'terapias', legacyId: 'services-section', label: 'Terapias', shortLabel: 'Terapias', icon: SimpleSpiralIcon },
+  { id: 'bio', legacyId: 'therapeutic-team-section', label: 'Bío', shortLabel: 'Bío', icon: User },
+  { id: 'contacto', legacyId: 'contact-section', label: 'Contacto', shortLabel: 'Contacto', icon: Mail },
 ];
+
+export const updateUrlAnchor = (cleanHash: string) => {
+  if (typeof window === 'undefined') return;
+  const current = window.location.hash.replace(/^#/, '');
+  if (current !== cleanHash) {
+    const targetUrl = cleanHash ? `${window.location.pathname}#${cleanHash}` : window.location.pathname;
+    try {
+      window.history.replaceState(null, '', targetUrl);
+    } catch (e) {
+      console.warn(e);
+    }
+  }
+};
 
 export default function FloatingNav({ onNavigateHomeAndScroll, activeTab, setActiveTab }: FloatingNavProps) {
   const [activeSection, setActiveSection] = useState<string>('');
@@ -105,11 +118,13 @@ export default function FloatingNav({ onNavigateHomeAndScroll, activeTab, setAct
 
   // Track scroll position to:
   // 1. Highlight currently active section
-  // 2. Transition desktop bar from Hero bottom position to top floating pill
+  // 2. Keep the URL anchor completely clean (absolute URL with only #ancla)
   useEffect(() => {
+    let scrollTimeout: NodeJS.Timeout | null = null;
+
     const handleScroll = () => {
       const scrollY = window.scrollY;
-      const heroEl = document.getElementById('hero-section');
+      const heroEl = document.getElementById('inicio') || document.getElementById('hero-section');
       const heroBottom = heroEl ? (heroEl.offsetTop + heroEl.offsetHeight - 120) : (window.innerHeight - 150);
       setIsScrolledPastHero(scrollY > heroBottom);
 
@@ -117,17 +132,22 @@ export default function FloatingNav({ onNavigateHomeAndScroll, activeTab, setAct
 
       if (scrollY < 200) {
         setActiveSection('');
+        if (scrollTimeout) clearTimeout(scrollTimeout);
+        scrollTimeout = setTimeout(() => updateUrlAnchor('inicio'), 150);
         return;
       }
 
-      const scrollPosition = scrollY + 120; // offset for sticky top navbar
+      const scrollPosition = scrollY + 140; // offset for sticky top navbar
 
       for (let i = SECTIONS.length - 1; i >= 0; i--) {
-        const section = document.getElementById(SECTIONS[i].id);
+        const sec = SECTIONS[i];
+        const section = document.getElementById(sec.id) || document.getElementById(sec.legacyId);
         if (section) {
           const top = section.offsetTop;
           if (scrollPosition >= top) {
-            setActiveSection(SECTIONS[i].id);
+            setActiveSection(sec.id);
+            if (scrollTimeout) clearTimeout(scrollTimeout);
+            scrollTimeout = setTimeout(() => updateUrlAnchor(sec.id), 150);
             break;
           }
         }
@@ -137,10 +157,14 @@ export default function FloatingNav({ onNavigateHomeAndScroll, activeTab, setAct
     window.addEventListener('scroll', handleScroll, { passive: true });
     handleScroll();
 
-    return () => window.removeEventListener('scroll', handleScroll);
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      if (scrollTimeout) clearTimeout(scrollTimeout);
+    };
   }, [activeTab]);
 
   const scrollToTop = () => {
+    updateUrlAnchor('inicio');
     if (activeTab !== 'home') {
       setActiveTab('home');
       setTimeout(() => {
@@ -152,8 +176,10 @@ export default function FloatingNav({ onNavigateHomeAndScroll, activeTab, setAct
   };
 
   const handleSectionClick = (sectionId: string) => {
+    updateUrlAnchor(sectionId);
     const scrollToTarget = () => {
-      const element = document.getElementById(sectionId);
+      const sec = SECTIONS.find(s => s.id === sectionId);
+      const element = document.getElementById(sectionId) || (sec ? document.getElementById(sec.legacyId) : null);
       if (element) {
         const navHeader = document.getElementById('desktop-floating-nav');
         const navHeight = (navHeader && window.innerWidth >= 768) ? navHeader.getBoundingClientRect().height : 0;

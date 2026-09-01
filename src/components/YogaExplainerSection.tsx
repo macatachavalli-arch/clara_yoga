@@ -94,9 +94,10 @@ export default function YogaExplainerSection({ slides: propSlides }: YogaExplain
 
   return (
     <section 
-      id="yoga-explainer" 
-      className="w-full bg-stone-sand scroll-mt-[48px] md:scroll-mt-[52px] min-h-[calc(100dvh-48px)] md:min-h-[calc(100dvh-52px)] py-6 sm:py-8 md:py-10 flex flex-col justify-between overflow-hidden"
+      id="yoga" 
+      className="w-full bg-stone-sand scroll-mt-[48px] md:scroll-mt-[52px] min-h-[calc(100dvh-48px)] md:min-h-[calc(100dvh-52px)] py-6 sm:py-8 md:py-10 flex flex-col justify-between overflow-hidden relative"
     >
+      <div id="yoga-explainer" className="sr-only" />
       {/* Upper Text Block - Raised and optimized for seamless screen fit */}
       <div className="mx-auto max-w-5xl px-4 sm:px-6 md:px-8 w-full my-auto">
         <div className="text-center flex flex-col items-center gap-1 sm:gap-2 max-w-4xl mx-auto">

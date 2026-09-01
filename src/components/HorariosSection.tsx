@@ -16,9 +16,10 @@ export default function HorariosSection({ services: propServices }: HorariosSect
 
   return (
     <section 
-      id="horarios-section" 
+      id="horarios" 
       className="relative w-full bg-stone-sand scroll-mt-[48px] md:scroll-mt-[52px] min-h-[calc(100dvh-48px)] md:min-h-[calc(100dvh-52px)] flex flex-col justify-center py-10 sm:py-12 md:py-14 overflow-hidden"
     >
+      <div id="horarios-section" className="sr-only" />
       {/* Background Image (100% tonalidad original sin atenuar) */}
       <div className="absolute inset-0 pointer-events-none z-0">
         <img

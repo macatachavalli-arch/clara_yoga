@@ -35,9 +35,10 @@ const ESTILOS_DATA: StyleItem[] = [
 export default function EstilosPracticaSection() {
   return (
     <section 
-      id="estilos-practica" 
-      className="w-full bg-stone-sand scroll-mt-[48px] md:scroll-mt-[52px] min-h-[calc(100dvh-48px)] md:min-h-[calc(100dvh-52px)] flex flex-col justify-center py-8 sm:py-12 md:py-16"
+      id="estilos" 
+      className="w-full bg-stone-sand scroll-mt-[48px] md:scroll-mt-[52px] min-h-[calc(100dvh-48px)] md:min-h-[calc(100dvh-52px)] flex flex-col justify-center py-8 sm:py-12 md:py-16 relative"
     >
+      <div id="estilos-practica" className="sr-only" />
       <div className="mx-auto max-w-7xl px-6 sm:px-8 w-full my-auto">
         {/* Header */}
         <div className="text-center mb-6 sm:mb-8 md:mb-10 max-w-3xl mx-auto">

@@ -47,7 +47,8 @@ export default function Hero({ onStartBooking, onExploreServices, onMyBookings }
   }, []);
 
   return (
-    <section id="hero-section" className="w-full relative overflow-hidden min-h-[calc(100dvh-48px)] md:min-h-[calc(100dvh-52px)] flex items-center justify-center">
+    <section id="inicio" className="w-full relative overflow-hidden min-h-[calc(100dvh-48px)] md:min-h-[calc(100dvh-52px)] flex items-center justify-center scroll-mt-[48px] md:scroll-mt-[52px]">
+      <div id="hero-section" className="sr-only" />
       {/* Full-screen video banner */}
       <div className="w-full h-full min-h-[calc(100dvh-48px)] md:min-h-[calc(100dvh-52px)] overflow-hidden relative bg-[#dcdcdc] flex items-center justify-center">
         <video
@@ -64,7 +65,7 @@ export default function Hero({ onStartBooking, onExploreServices, onMyBookings }
         {/* Soft dark overlay for text/logo contrast */}
         <div className="absolute inset-0 bg-stone-900/30 backdrop-blur-[0.5px] pointer-events-none" />
 
-        {/* Centered Logo over video with slow soft fade-in (0 to 100) */}
+        {/* Centered Logo over video with slow soft fade-in (0 to 100) - elevated by 7% */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -74,7 +75,7 @@ export default function Hero({ onStartBooking, onExploreServices, onMyBookings }
           <img
             src="/logo_clarayoga.svg"
             alt="Clara Yoga"
-            className="w-auto h-auto max-w-[75%] max-h-[60vh] sm:max-w-[55%] md:max-w-[440px] lg:max-w-[500px] object-contain drop-shadow-2xl"
+            className="w-auto h-auto max-w-[75%] max-h-[60vh] sm:max-w-[55%] md:max-w-[440px] lg:max-w-[500px] object-contain drop-shadow-2xl -translate-y-[7%]"
           />
         </motion.div>
       </div>

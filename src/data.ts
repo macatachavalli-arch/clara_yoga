@@ -187,35 +187,35 @@ export const DEFAULT_QUICK_ACCESS_BUTTONS: QuickAccessButton[] = [
     title: 'YOGA',
     subtitle: 'Prácticas & Horarios',
     image: 'https://images.unsplash.com/photo-1545205597-3d9d02c29597?auto=format&fit=crop&q=80&w=800',
-    targetSection: '#yoga-explainer'
+    targetSection: '#yoga'
   },
   {
     id: 'btn-shiatsu',
     title: 'SHIATSU ZEN',
     subtitle: 'Masaje Japonés',
     image: 'https://images.unsplash.com/photo-1518611012118-696072aa579a?auto=format&fit=crop&q=80&w=800',
-    targetSection: '#services-section'
+    targetSection: '#terapias'
   },
   {
     id: 'btn-reiki',
     title: 'REIKI',
     subtitle: 'Armonización Usui',
     image: 'https://images.unsplash.com/photo-1512290900672-1f02e6005721?auto=format&fit=crop&q=80&w=800',
-    targetSection: '#services-section'
+    targetSection: '#terapias'
   },
   {
     id: 'btn-talleres',
     title: 'TALLERES',
     subtitle: 'Encuentros & Retiros',
     image: 'https://images.unsplash.com/photo-1599447421416-3414500d18a5?auto=format&fit=crop&q=80&w=800',
-    targetSection: '#horarios-section'
+    targetSection: '#horarios'
   },
   {
     id: 'btn-arte',
     title: 'ARTE',
     subtitle: 'Expresión Consciente',
     image: 'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?auto=format&fit=crop&q=80&w=800',
-    targetSection: '#contact-section'
+    targetSection: '#contacto'
   }
 ];
 

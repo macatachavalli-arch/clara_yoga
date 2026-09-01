@@ -5,9 +5,13 @@
 
 import { useState, FormEvent } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { User, Mail, MessageSquare, Send, CheckCircle2, Copy, ExternalLink } from 'lucide-react';
+import { User, Mail, MessageSquare, Send, CheckCircle2, Copy, ExternalLink, Instagram, Lock } from 'lucide-react';
 
-export default function ContactSection() {
+interface ContactSectionProps {
+  onAdminClick?: () => void;
+}
+
+export default function ContactSection({ onAdminClick }: ContactSectionProps) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [message, setMessage] = useState('');
@@ -56,9 +60,10 @@ export default function ContactSection() {
 
   return (
     <section 
-      id="contact-section" 
-      className="py-8 sm:py-10 md:py-12 bg-[#232323] text-stone-200 scroll-mt-[48px] md:scroll-mt-[52px] min-h-[calc(100dvh-48px)] md:min-h-[calc(100dvh-52px)] flex flex-col justify-center"
+      id="contacto" 
+      className="pt-8 sm:pt-10 md:pt-12 pb-3 bg-[#232323] text-stone-200 scroll-mt-[48px] md:scroll-mt-[52px] min-h-[calc(100dvh-48px)] md:min-h-[calc(100dvh-52px)] flex flex-col justify-between relative"
     >
+      <div id="contact-section" className="sr-only" />
       <div className="mx-auto max-w-3xl px-6 sm:px-8 w-full my-auto">
         
         <div className="space-y-6">
@@ -201,7 +206,34 @@ export default function ContactSection() {
               )}
             </AnimatePresence>
           </div>
+        </div>
 
+      {/* Extreme bottom copyright and small icons */}
+      <div className="w-full pt-4 pb-20 md:pb-4">
+        <div className="mx-auto max-w-3xl px-6 sm:px-8 flex flex-row items-center justify-between gap-4 text-xs text-stone-400">
+          <p>© 2026 Maria Clara . Yoga</p>
+          <div className="flex items-center gap-4">
+            {onAdminClick && (
+              <button 
+                onClick={onAdminClick}
+                title="Panel de gestión"
+                aria-label="Panel de gestión"
+                className="hidden md:inline-flex text-stone-500 hover:text-stone-300 transition-colors cursor-pointer p-1"
+              >
+                <Lock className="h-3.5 w-3.5" />
+              </button>
+            )}
+            <a 
+              href="https://www.instagram.com/mariaclara.yoga/" 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              aria-label="Instagram @mariaclara.yoga"
+              className="text-stone-400 hover:text-stone-200 transition-colors inline-flex items-center p-1"
+            >
+              <Instagram className="h-5 w-5" />
+            </a>
+          </div>
+        </div>
       </div>
     </section>
   );

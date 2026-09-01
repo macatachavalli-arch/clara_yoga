@@ -20,9 +20,10 @@ export default function ServicesPanel({ services, onSelectService }: ServicesPan
 
   return (
     <section 
-      id="services-section" 
-      className="py-8 sm:py-10 md:py-12 bg-stone-sand scroll-mt-[48px] md:scroll-mt-[52px] min-h-[calc(100dvh-48px)] md:min-h-[calc(100dvh-52px)] flex flex-col justify-center"
+      id="terapias" 
+      className="py-8 sm:py-10 md:py-12 bg-stone-sand scroll-mt-[48px] md:scroll-mt-[52px] min-h-[calc(100dvh-48px)] md:min-h-[calc(100dvh-52px)] flex flex-col justify-center relative"
     >
+      <div id="services-section" className="sr-only" />
       <div className="mx-auto max-w-7xl px-6 sm:px-8 w-full my-auto">
         
         {/* Services Grid Display */}
