@@ -1,7 +1,7 @@
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
-import { CarouselSlide, Service, BlockedSlot, Booking } from '../types';
-import { SERVICES, DEFAULT_CAROUSEL_SLIDES, DEFAULT_CAROUSEL_SLIDES_2 } from '../data';
+import { CarouselSlide, Service, BlockedSlot, Booking, QuickAccessButton } from '../types';
+import { SERVICES, DEFAULT_CAROUSEL_SLIDES, DEFAULT_CAROUSEL_SLIDES_2, DEFAULT_QUICK_ACCESS_BUTTONS } from '../data';
 
 // Helper to strip undefined values for Firestore setDoc compatibility
 function cleanForFirestore<T>(data: T): T {
@@ -185,3 +185,43 @@ export async function saveBookingsToFirestore(bookings: Booking[]): Promise<bool
     return true;
   }
 }
+
+// Quick Access Buttons
+export async function getQuickButtonsFromFirestore(): Promise<QuickAccessButton[]> {
+  try {
+    const docRef = doc(db, 'appData', 'quickButtons');
+    const snap = await getDoc(docRef);
+    if (snap.exists() && Array.isArray(snap.data()?.buttons) && snap.data().buttons.length > 0) {
+      return snap.data().buttons;
+    }
+  } catch (err) {
+    // Quota or offline fallback
+  }
+
+  const cached = localStorage.getItem('clara_cached_quick_buttons');
+  if (cached) {
+    try {
+      const parsed = JSON.parse(cached);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    } catch (e) {}
+  }
+
+  return DEFAULT_QUICK_ACCESS_BUTTONS;
+}
+
+export async function saveQuickButtonsToFirestore(buttons: QuickAccessButton[]): Promise<boolean> {
+  try {
+    localStorage.setItem('clara_cached_quick_buttons', JSON.stringify(buttons));
+  } catch (e) { console.warn(e); }
+
+  try {
+    const docRef = doc(db, 'appData', 'quickButtons');
+    const payload = cleanForFirestore({ buttons, updatedAt: new Date().toISOString() });
+    await setDoc(docRef, payload);
+    return true;
+  } catch (err) {
+    console.warn('[Firestore] Notice: quickButtons saved locally (Quota/Offline).');
+    return true;
+  }
+}
+

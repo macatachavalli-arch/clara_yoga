@@ -10,11 +10,14 @@ import {
   Save, Undo2, AlertCircle, CheckCircle, Sparkles, X, ChevronRight, FileText, Plus, Calendar, Clock,
   User, Phone, Upload, Image as ImageIcon, ArrowUp, ArrowDown
 } from 'lucide-react';
-import { Service, BlockedSlot, Booking } from '../types';
+import { Service, BlockedSlot, Booking, CarouselSlide } from '../types';
+import { DEFAULT_CAROUSEL_SLIDES } from '../data';
 import { 
   saveServicesToFirestore, 
   saveBlockedSlotsToFirestore, 
-  saveBookingsToFirestore 
+  saveBookingsToFirestore,
+  saveCarouselToFirestore,
+  getCarouselFromFirestore
 } from '../lib/firestoreStorage';
 
 interface AdminPanelProps {
@@ -25,6 +28,8 @@ interface AdminPanelProps {
   onClose: () => void;
   bookings: Booking[];
   onBookingsUpdated: (updatedBookings: Booking[]) => void;
+  carouselSlides?: CarouselSlide[];
+  onCarouselUpdated?: (updatedSlides: CarouselSlide[]) => void;
 }
 
 // Pre-defined templates for creating new service cards
@@ -130,7 +135,9 @@ export default function AdminPanel({
   onBlockedSlotsUpdated, 
   onClose,
   bookings,
-  onBookingsUpdated
+  onBookingsUpdated,
+  carouselSlides,
+  onCarouselUpdated
 }: AdminPanelProps) {
   // Authentication states
   const [passwordInput, setPasswordInput] = useState<string>('');
@@ -139,8 +146,35 @@ export default function AdminPanel({
   const [loginError, setLoginError] = useState<string>('');
   const [isLoginLoading, setIsLoginLoading] = useState<boolean>(false);
 
-  // Toggle active administration tab: 'services' | 'blocks' | 'bookings'
-  const [adminTab, setAdminTab] = useState<'services' | 'blocks' | 'bookings'>('services');
+  // Toggle active administration tab: 'services' | 'carousel' | 'blocks' | 'bookings'
+  const [adminTab, setAdminTab] = useState<'services' | 'carousel' | 'blocks' | 'bookings'>('services');
+
+  // Yoga Carousel Management states
+  const [carouselSlidesList, setCarouselSlidesList] = useState<CarouselSlide[]>(() => {
+    if (carouselSlides && carouselSlides.length > 0) return carouselSlides;
+    try {
+      const cached = localStorage.getItem('clara_cached_carousel1');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {}
+    return DEFAULT_CAROUSEL_SLIDES;
+  });
+  const [selectedSlide, setSelectedSlide] = useState<CarouselSlide | null>(null);
+  const [isCreatingSlide, setIsCreatingSlide] = useState<boolean>(false);
+  const [slideImageInput, setSlideImageInput] = useState<string>('');
+  const [slideTitleInput, setSlideTitleInput] = useState<string>('');
+  const [slideDescInput, setSlideDescInput] = useState<string>('');
+  const [isUploadingSlideImage, setIsUploadingSlideImage] = useState<boolean>(false);
+  const [deleteConfirmSlideId, setDeleteConfirmSlideId] = useState<string | null>(null);
+
+  // Sync prop changes for carouselSlides
+  useEffect(() => {
+    if (carouselSlides && carouselSlides.length > 0) {
+      setCarouselSlidesList(carouselSlides);
+    }
+  }, [carouselSlides]);
 
   // Booking management states
   const [editingBooking, setEditingBooking] = useState<Booking | null>(null);
@@ -179,6 +213,8 @@ export default function AdminPanel({
   const [editPriceYogaPaseLibre, setEditPriceYogaPaseLibre] = useState<number>(55000);
   const [editIntensity, setEditIntensity] = useState<'Suave' | 'Moderada' | 'Intensa' | 'Restaurativa' | 'Equilibrio' | 'Sintonización Energética'>('Suave');
   const [editHighlightNote, setEditHighlightNote] = useState<string>('');
+  const [editBackgroundImage, setEditBackgroundImage] = useState<string>('');
+  const [isUploadingBgImage, setIsUploadingBgImage] = useState<boolean>(false);
   const [editBenefits, setEditBenefits] = useState<string[]>([]);
   const [newBenefitInput, setNewBenefitInput] = useState<string>('');
 
@@ -268,6 +304,7 @@ export default function AdminPanel({
     setEditPriceYogaPaseLibre(service.priceYogaPaseLibre ?? service.priceYoga12 ?? 55000);
     setEditIntensity(service.intensity || 'Suave');
     setEditHighlightNote(service.highlightNote || '');
+    setEditBackgroundImage(service.backgroundImage || '');
     setEditBenefits([...service.benefits]);
     setNewBenefitInput('');
     setStatusMessage(null);
@@ -295,6 +332,7 @@ export default function AdminPanel({
     setEditPriceYogaPaseLibre((template as any).priceYogaPaseLibre ?? (template as any).priceYoga12 ?? 55000);
     setEditIntensity(template.intensity);
     setEditHighlightNote(('highlightNote' in template) ? (template as any).highlightNote : '');
+    setEditBackgroundImage('');
     setEditBenefits([...template.benefits]);
     setNewBenefitInput('');
     setStatusMessage(null);
@@ -335,6 +373,7 @@ export default function AdminPanel({
       priceYogaPaseLibre: editCategory === 'yoga' ? (Number(editPriceYogaPaseLibre) || 0) : undefined,
       intensity: editIntensity,
       highlightNote: editHighlightNote.trim() || undefined,
+      backgroundImage: editBackgroundImage.trim() || undefined,
       benefits: editBenefits
     };
 
@@ -376,6 +415,7 @@ export default function AdminPanel({
         priceYogaPaseLibre: editCategory === 'yoga' ? (Number(editPriceYogaPaseLibre) || 0) : undefined,
         intensity: editIntensity,
         highlightNote: editHighlightNote.trim() || undefined,
+        backgroundImage: editBackgroundImage.trim() || undefined,
         benefits: editBenefits
       };
 
@@ -610,6 +650,173 @@ export default function AdminPanel({
     handleSyncWithBackend(updatedList);
   };
 
+  // --- 📸 YOGA CAROUSEL MANAGEMENT HANDLERS ---
+  const handleStartCreateSlide = () => {
+    setSelectedSlide({
+      id: `slide-${Date.now()}`,
+      image: '',
+      title: '',
+      description: ''
+    });
+    setIsCreatingSlide(true);
+    setSlideImageInput('');
+    setSlideTitleInput('');
+    setSlideDescInput('');
+    setStatusMessage(null);
+  };
+
+  const handleStartEditSlide = (slide: CarouselSlide) => {
+    setSelectedSlide(slide);
+    setIsCreatingSlide(false);
+    setSlideImageInput(slide.image);
+    setSlideTitleInput(slide.title || '');
+    setSlideDescInput(slide.description || '');
+    setStatusMessage(null);
+  };
+
+  const handleUploadSlideImage = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingSlideImage(true);
+    try {
+      const base64 = await compressImage(file, 1400, 900, 0.82);
+      const activeToken = token || localStorage.getItem('clara_admin_token') || 'clara_admin_session_token_2026';
+      
+      // Attempt server-side image upload to get a lightweight URL
+      try {
+        const uploadResp = await fetch('/api/upload', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${activeToken}`
+          },
+          body: JSON.stringify({
+            image: base64,
+            name: selectedSlide?.id || `slide-${Date.now()}`
+          })
+        });
+
+        if (uploadResp.ok) {
+          const uploadData = await uploadResp.json();
+          if (uploadData.success && uploadData.url) {
+            setSlideImageInput(uploadData.url);
+            setStatusMessage({ text: 'Foto subida y optimizada con éxito.', isError: false });
+            setIsUploadingSlideImage(false);
+            return;
+          }
+        }
+      } catch (uploadErr) {
+        console.warn('Direct upload endpoint failed, falling back to compressed base64:', uploadErr);
+      }
+
+      setSlideImageInput(base64);
+      setStatusMessage({ text: 'Foto procesada correctamente y lista para guardar.', isError: false });
+    } catch (err) {
+      console.error(err);
+      setStatusMessage({ text: 'Error al procesar la imagen seleccionada.', isError: true });
+    } finally {
+      setIsUploadingSlideImage(false);
+    }
+  };
+
+  const handleSyncCarouselWithBackend = async (listToSync = carouselSlidesList) => {
+    setSaveLoading(true);
+    setStatusMessage(null);
+
+    let finalSlides = listToSync;
+
+    try {
+      const activeToken = token || localStorage.getItem('clara_admin_token') || 'clara_admin_session_token_2026';
+      const resp = await fetch('/api/carousel/1', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${activeToken}`
+        },
+        body: JSON.stringify({ slides: listToSync })
+      });
+
+      if (resp.ok) {
+        const data = await resp.json();
+        if (data.success && Array.isArray(data.slides)) {
+          finalSlides = data.slides;
+          setCarouselSlidesList(data.slides);
+          if (onCarouselUpdated) onCarouselUpdated(data.slides);
+        }
+      }
+    } catch (err) {
+      console.warn('Backend API unavailable. Saving directly to Firestore and local cache.', err);
+    }
+
+    // Save final processed lightweight slides to Firestore & local storage
+    await saveCarouselToFirestore(finalSlides, 1);
+
+    if (onCarouselUpdated) {
+      onCarouselUpdated(finalSlides);
+    }
+
+    setStatusMessage({ 
+      text: '¡Carrusel de Yoga guardado y sincronizado con éxito en la nube!', 
+      isError: false 
+    });
+    setSaveLoading(false);
+  };
+
+  const handleSaveSlideLocally = async () => {
+    if (!slideImageInput.trim()) {
+      setStatusMessage({ text: 'Por favor, sube una foto o ingresa el enlace de la imagen.', isError: true });
+      return;
+    }
+
+    if (!selectedSlide) return;
+
+    const updatedSlide: CarouselSlide = {
+      id: selectedSlide.id,
+      image: slideImageInput.trim(),
+      title: slideTitleInput.trim(),
+      description: slideDescInput.trim()
+    };
+
+    let updatedList: CarouselSlide[];
+    if (isCreatingSlide) {
+      updatedList = [...carouselSlidesList, updatedSlide];
+    } else {
+      updatedList = carouselSlidesList.map(s => s.id === selectedSlide.id ? updatedSlide : s);
+    }
+
+    setCarouselSlidesList(updatedList);
+    setSelectedSlide(null);
+    setIsCreatingSlide(false);
+
+    // Sync with backend / Firestore immediately
+    await handleSyncCarouselWithBackend(updatedList);
+  };
+
+  const handleDeleteSlide = (slideId: string) => {
+    const updatedList = carouselSlidesList.filter(s => s.id !== slideId);
+    setCarouselSlidesList(updatedList);
+    setDeleteConfirmSlideId(null);
+    if (selectedSlide?.id === slideId) {
+      setSelectedSlide(null);
+      setIsCreatingSlide(false);
+    }
+    handleSyncCarouselWithBackend(updatedList);
+  };
+
+  const handleMoveSlide = (index: number, direction: 'up' | 'down') => {
+    const newIdx = direction === 'up' ? index - 1 : index + 1;
+    if (newIdx < 0 || newIdx >= carouselSlidesList.length) return;
+
+    const updated = [...carouselSlidesList];
+    const temp = updated[index];
+    updated[index] = updated[newIdx];
+    updated[newIdx] = temp;
+
+    setCarouselSlidesList(updated);
+    handleSyncCarouselWithBackend(updated);
+  };
+
   return (
     <div id="admin-panel-container" className="mx-auto max-w-5xl px-4 py-12">
       
@@ -704,6 +911,22 @@ export default function AdminPanel({
               }`}
             >
               Tarjetas de Servicios
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setAdminTab('carousel');
+                setStatusMessage(null);
+                setSelectedSlide(null);
+                setIsCreatingSlide(false);
+              }}
+              className={`px-5 py-3.5 text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer rounded-none border-b-2 ${
+                adminTab === 'carousel'
+                  ? 'border-primary text-stone-charcoal bg-white'
+                  : 'border-transparent text-stone-400 hover:text-stone-700 hover:bg-stone-50/50'
+              }`}
+            >
+              Carrusel Yoga 📸
             </button>
             <button
               type="button"
@@ -845,6 +1068,12 @@ export default function AdminPanel({
                               }`}>
                                 {service.category === 'yoga' ? 'Yoga' : service.category === 'shiatsu' ? 'Masaje Shiatsu Zen' : service.category === 'combo' ? 'Combo de Bienestar' : 'Reiki Usui'}
                               </span>
+                              {service.backgroundImage && (
+                                <span className="flex items-center gap-1 text-[8px] font-medium bg-stone-sand text-stone-700 px-1.5 py-0.5 border border-stone-borders">
+                                  <ImageIcon className="w-2.5 h-2.5 text-stone-500" />
+                                  Con Foto
+                                </span>
+                              )}
                               <span className="text-[9px] font-mono text-stone-400">
                                 {service.duration} min • {
                                   service.category === 'yoga'
@@ -1091,7 +1320,7 @@ export default function AdminPanel({
                         <div>
                           <div className="flex items-center justify-between mb-2">
                             <label className="block text-[9px] font-bold uppercase tracking-[0.15em] text-stone-charcoal">
-                              Precio de Inversión ($ ARS)
+                              Precio de la Sesión ($ ARS)
                             </label>
                             <label className="flex items-center gap-1.5 text-[10px] text-stone-600 font-sans cursor-pointer">
                               <input
@@ -1101,17 +1330,17 @@ export default function AdminPanel({
                                   if (e.target.checked) {
                                     setEditPrice(0);
                                   } else {
-                                    setEditPrice(4000);
+                                    setEditPrice(40000);
                                   }
                                 }}
                                 className="rounded-none border-stone-borders text-stone-charcoal focus:ring-0 cursor-pointer"
                               />
-                              <span>Sin precio especificado (A consultar)</span>
+                              <span>Sin precio visible (ocultar)</span>
                             </label>
                           </div>
                           <input
                             type="number"
-                            placeholder="3500"
+                            placeholder="40000"
                             min="0"
                             disabled={!editPrice || Number(editPrice) === 0}
                             value={!editPrice || Number(editPrice) === 0 ? '' : editPrice}
@@ -1121,9 +1350,13 @@ export default function AdminPanel({
                             }}
                             className="w-full rounded-none border border-stone-borders bg-white px-3.5 py-3 text-xs text-stone-charcoal font-sans transition-colors focus:border-stone-charcoal outline-hidden disabled:bg-stone-sand/40 disabled:text-stone-400 disabled:cursor-not-allowed"
                           />
-                          {(!editPrice || Number(editPrice) === 0) && (
+                          {(!editPrice || Number(editPrice) === 0) ? (
                             <span className="block text-[10px] text-stone-400 italic mt-1 font-sans">
-                              Se mostrará como "A consultar" en las tarjetas.
+                              * Si dejas este campo vacío o en 0, no se mostrará ningún precio en la tarjeta.
+                            </span>
+                          ) : (
+                            <span className="block text-[10px] text-stone-500 italic mt-1 font-sans">
+                              * Se mostrará como ${Number(editPrice).toLocaleString('es-AR')} ARS en la tarjeta.
                             </span>
                           )}
                         </div>
@@ -1159,6 +1392,146 @@ export default function AdminPanel({
                       <span className="block text-[10px] text-stone-500 italic mt-1 font-sans">
                         Puedes presionar Enter para escribir en varias líneas. Se respetarán los saltos de línea en las tarjetas.
                       </span>
+                    </div>
+
+                    {/* Background Image Uploader & Manager */}
+                    <div className="p-4 bg-white border border-stone-borders space-y-3">
+                      <div className="flex items-center justify-between">
+                        <label className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-[0.15em] text-stone-charcoal">
+                          <ImageIcon className="w-3.5 h-3.5 text-stone-gold" />
+                          Imagen de Fondo de la Tarjeta (Opcional)
+                        </label>
+                        {editBackgroundImage && (
+                          <button
+                            type="button"
+                            onClick={() => setEditBackgroundImage('')}
+                            className="text-[9px] text-red-600 hover:text-red-700 font-bold uppercase tracking-wider flex items-center gap-1 cursor-pointer transition-colors"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                            Quitar Imagen
+                          </button>
+                        )}
+                      </div>
+
+                      {editBackgroundImage ? (
+                        <div className="space-y-3">
+                          {/* Image preview box */}
+                          <div className="relative w-full h-40 bg-stone-sand/30 border border-stone-borders overflow-hidden flex items-center justify-center group">
+                            <img
+                              src={editBackgroundImage}
+                              alt="Vista previa de fondo"
+                              className="w-full h-full object-cover object-center"
+                              referrerPolicy="no-referrer"
+                            />
+                            {/* Card mockup overlay showing real tone */}
+                            <div className="absolute inset-0 p-4 flex flex-col justify-between pointer-events-none bg-gradient-to-t from-black/40 via-transparent to-transparent">
+                              <div>
+                                <span className="text-[8px] font-mono uppercase tracking-widest text-white/90 drop-shadow-xs block">Tonalidad Real</span>
+                                <h5 className="font-serif text-base font-light text-white drop-shadow-xs mt-1 truncate">{editName || 'Título del Servicio'}</h5>
+                              </div>
+                              <span className="text-[9px] font-sans text-white/90 drop-shadow-xs italic">La imagen se muestra en su tonalidad y color real.</span>
+                            </div>
+
+                            {/* Hover overlay actions */}
+                            <div className="absolute inset-0 bg-stone-charcoal/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                              <label className="bg-white text-stone-charcoal text-[9px] font-bold uppercase tracking-wider px-3 py-2 cursor-pointer hover:bg-stone-sand transition-colors flex items-center gap-1 shadow-sm">
+                                <Upload className="w-3 h-3" />
+                                Reemplazar Imagen
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  className="hidden"
+                                  onChange={async (e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) {
+                                      setIsUploadingBgImage(true);
+                                      try {
+                                        const compressed = await compressImage(file, 1600, 1200, 0.85);
+                                        setEditBackgroundImage(compressed);
+                                      } catch (err) {
+                                        console.error('Error procesando imagen:', err);
+                                      } finally {
+                                        setIsUploadingBgImage(false);
+                                      }
+                                    }
+                                  }}
+                                />
+                              </label>
+                              <button
+                                type="button"
+                                onClick={() => setEditBackgroundImage('')}
+                                className="bg-[#b92c2c] text-white text-[9px] font-bold uppercase tracking-wider px-3 py-2 cursor-pointer hover:bg-red-700 transition-colors flex items-center gap-1 shadow-sm"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                                Quitar
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Alternative direct URL input */}
+                          <div className="pt-1">
+                            <label className="block text-[8px] font-mono uppercase tracking-widest text-stone-400 mb-1">
+                              Enlace directo de la imagen (o editar URL)
+                            </label>
+                            <input
+                              type="text"
+                              value={editBackgroundImage.startsWith('data:') ? 'Imagen cargada en base64 (almacenada localmente)' : editBackgroundImage}
+                              onChange={(e) => setEditBackgroundImage(e.target.value)}
+                              placeholder="https://images.unsplash.com/..."
+                              disabled={editBackgroundImage.startsWith('data:')}
+                              className="w-full rounded-none border border-stone-borders bg-white px-3 py-2 text-xs font-mono text-stone-600 transition-colors focus:border-stone-charcoal outline-hidden disabled:bg-stone-sand/30 disabled:text-stone-400"
+                            />
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          {/* Upload zone */}
+                          <label className="border-2 border-dashed border-stone-borders hover:border-stone-charcoal p-6 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all bg-stone-sand/15 hover:bg-stone-sand/30">
+                            <Upload className="w-5 h-5 text-stone-500" />
+                            <div className="text-center">
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-stone-charcoal block">
+                                {isUploadingBgImage ? 'Procesando imagen...' : 'Subir imagen desde tu dispositivo'}
+                              </span>
+                              <span className="text-[9px] text-stone-400 mt-0.5 block font-sans">
+                                JPG, PNG o WebP (se optimizará y comprimirá automáticamente)
+                              </span>
+                            </div>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              disabled={isUploadingBgImage}
+                              className="hidden"
+                              onChange={async (e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  setIsUploadingBgImage(true);
+                                  try {
+                                    const compressed = await compressImage(file, 1600, 1200, 0.85);
+                                    setEditBackgroundImage(compressed);
+                                  } catch (err) {
+                                    console.error('Error al procesar la imagen:', err);
+                                    setStatusMessage({ text: 'No se pudo procesar el archivo seleccionado.', isError: true });
+                                  } finally {
+                                    setIsUploadingBgImage(false);
+                                  }
+                                }
+                              }}
+                            />
+                          </label>
+
+                          {/* Or paste URL */}
+                          <div className="flex items-center gap-2">
+                            <span className="text-[8px] font-mono uppercase tracking-widest text-stone-400 shrink-0">O pegar URL:</span>
+                            <input
+                              type="url"
+                              placeholder="https://..."
+                              value={editBackgroundImage}
+                              onChange={(e) => setEditBackgroundImage(e.target.value)}
+                              className="w-full rounded-none border border-stone-borders bg-white px-2.5 py-1.5 text-xs text-stone-charcoal transition-colors focus:border-stone-charcoal outline-hidden"
+                            />
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     {/* Save Locally Actions */}
@@ -1209,6 +1582,312 @@ export default function AdminPanel({
             </button>
           </div>
           </>
+          )}
+
+          {/* 📸 YOGA CAROUSEL MANAGER VIEW */}
+          {adminTab === 'carousel' && (
+            <div className="space-y-6 pb-12">
+              <div className="flex flex-wrap items-center justify-between gap-4 p-5 bg-white border border-stone-borders">
+                <div>
+                  <h3 className="font-serif text-lg text-stone-charcoal font-light">
+                    Fotos del Carrusel de Yoga
+                  </h3>
+                  <p className="text-xs text-stone-500 font-light mt-0.5">
+                    Estas imágenes se presentan de a 3 de forma horizontal a lo ancho completo en la sección de Yoga.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleStartCreateSlide}
+                  className="flex items-center gap-1.5 px-4 py-2.5 bg-stone-charcoal hover:bg-emerald-700 text-stone-sand text-[10px] font-bold uppercase tracking-wider transition-colors cursor-pointer"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Agregar Nueva Foto
+                </button>
+              </div>
+
+              <div className="grid gap-6 lg:grid-cols-12 items-start">
+                {/* LEFT: Slides list */}
+                <div className="lg:col-span-7 space-y-4">
+                  {carouselSlidesList.length === 0 ? (
+                    <div className="p-12 text-center bg-white border border-dashed border-stone-borders">
+                      <ImageIcon className="h-8 w-8 text-stone-300 mx-auto mb-2" />
+                      <p className="text-sm font-serif italic text-stone-400">
+                        Aún no has agregado fotos al carrusel.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={handleStartCreateSlide}
+                        className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 bg-stone-charcoal text-white text-xs uppercase font-bold tracking-wider"
+                      >
+                        <Plus className="h-3.5 w-3.5" /> Subir primera foto
+                      </button>
+                    </div>
+                  ) : (
+                    carouselSlidesList.map((slide, idx) => (
+                      <div
+                        key={slide.id || `slide-${idx}`}
+                        className={`p-4 bg-white border transition-all flex flex-col sm:flex-row items-start sm:items-center gap-4 ${
+                          selectedSlide?.id === slide.id
+                            ? 'border-stone-charcoal ring-1 ring-stone-charcoal'
+                            : 'border-stone-borders hover:border-stone-400'
+                        }`}
+                      >
+                        {/* Thumbnail */}
+                        <div className="w-full sm:w-32 h-20 bg-stone-100 border border-stone-borders overflow-hidden shrink-0 relative">
+                          <img
+                            src={slide.image}
+                            alt={slide.title || `Foto ${idx + 1}`}
+                            className="w-full h-full object-cover"
+                            referrerPolicy="no-referrer"
+                          />
+                          <span className="absolute bottom-1 left-1 bg-black/60 text-white text-[9px] font-mono px-1">
+                            #{idx + 1}
+                          </span>
+                        </div>
+
+                        {/* Title and details */}
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-serif text-sm text-stone-charcoal font-medium truncate">
+                            {slide.title || <span className="italic text-stone-400">Sin título</span>}
+                          </h4>
+                          {slide.description && (
+                            <p className="text-xs text-stone-500 font-light truncate mt-0.5">
+                              {slide.description}
+                            </p>
+                          )}
+                          <p className="text-[10px] text-stone-400 font-mono mt-1">
+                            Posición {idx + 1} de {carouselSlidesList.length}
+                          </p>
+                        </div>
+
+                        {/* Reorder & Action buttons */}
+                        <div className="flex items-center gap-1.5 w-full sm:w-auto justify-end border-t sm:border-t-0 pt-2 sm:pt-0 border-stone-100">
+                          {deleteConfirmSlideId === slide.id ? (
+                            <div className="flex items-center gap-1 bg-red-50 border border-red-200 p-1">
+                              <span className="text-[9px] text-red-650 font-bold uppercase tracking-wider px-1">
+                                ¿Eliminar?
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteSlide(slide.id || `slide-${idx}`)}
+                                className="px-2 py-1 text-[9px] font-bold uppercase tracking-wider text-white bg-[#b92c2c] hover:bg-red-705 transition-colors cursor-pointer"
+                              >
+                                Sí
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setDeleteConfirmSlideId(null)}
+                                className="px-2 py-1 text-[9px] font-bold uppercase tracking-wider text-stone-600 border border-stone-borders bg-white hover:bg-stone-sand transition-colors cursor-pointer"
+                              >
+                                No
+                              </button>
+                            </div>
+                          ) : (
+                            <>
+                              <button
+                                type="button"
+                                disabled={idx === 0}
+                                onClick={() => handleMoveSlide(idx, 'up')}
+                                className="p-1.5 border border-stone-borders text-stone-600 hover:bg-stone-sand disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer"
+                                title="Mover arriba"
+                              >
+                                <ArrowUp className="h-3.5 w-3.5" />
+                              </button>
+
+                              <button
+                                type="button"
+                                disabled={idx === carouselSlidesList.length - 1}
+                                onClick={() => handleMoveSlide(idx, 'down')}
+                                className="p-1.5 border border-stone-borders text-stone-600 hover:bg-stone-sand disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer"
+                                title="Mover abajo"
+                              >
+                                <ArrowDown className="h-3.5 w-3.5" />
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => handleStartEditSlide(slide)}
+                                className="flex items-center gap-1 px-2.5 py-1.5 border border-stone-borders hover:bg-stone-sand text-stone-charcoal text-[10px] uppercase font-bold tracking-wider cursor-pointer"
+                              >
+                                <Edit3 className="h-3 w-3" />
+                                Editar
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => setDeleteConfirmSlideId(slide.id || `slide-${idx}`)}
+                                className="p-1.5 border border-red-200 text-red-600 hover:bg-red-50 cursor-pointer"
+                                title="Eliminar foto"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {/* RIGHT: Slide Editor / Uploader */}
+                <div className="lg:col-span-5 bg-white border border-stone-borders p-6 space-y-5">
+                  {selectedSlide ? (
+                    <div className="space-y-4">
+                      <div>
+                        <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-stone-charcoal block">
+                          {isCreatingSlide ? 'Agregar Nueva Foto' : 'Editar Foto del Carrusel'}
+                        </span>
+                        <p className="text-[11px] text-stone-400 mt-1 font-light leading-relaxed">
+                          Sube una foto desde tu dispositivo o ingresa un enlace directo. Se optimizará para visualización horizontal.
+                        </p>
+                      </div>
+
+                      {/* Image Preview & Upload options */}
+                      <div className="space-y-3">
+                        <label className="block text-[9px] font-bold uppercase tracking-widest text-stone-600">
+                          Foto / Imagen *
+                        </label>
+
+                        {slideImageInput ? (
+                          <div className="space-y-3">
+                            <div className="relative w-full aspect-[16/10] bg-stone-100 border border-stone-borders overflow-hidden">
+                              <img
+                                src={slideImageInput}
+                                alt="Vista previa"
+                                className="w-full h-full object-cover"
+                                referrerPolicy="no-referrer"
+                              />
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => setSlideImageInput('')}
+                              className="text-[10px] font-bold text-red-600 uppercase tracking-wider hover:underline block"
+                            >
+                              Cambiar imagen
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="space-y-3">
+                            {/* Device Upload Zone */}
+                            <label className="border-2 border-dashed border-stone-borders hover:border-stone-charcoal p-6 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all bg-stone-sand/15 hover:bg-stone-sand/30">
+                              <Upload className="w-6 h-6 text-stone-500" />
+                              <div className="text-center">
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-stone-charcoal block">
+                                  {isUploadingSlideImage ? 'Procesando foto...' : 'Subir foto desde tu dispositivo'}
+                                </span>
+                                <span className="text-[9px] text-stone-400 mt-0.5 block font-sans">
+                                  JPG, PNG o WebP (optimización automática)
+                                </span>
+                              </div>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                disabled={isUploadingSlideImage}
+                                className="hidden"
+                                onChange={handleUploadSlideImage}
+                              />
+                            </label>
+
+                            {/* Or direct URL */}
+                            <div className="space-y-1 pt-1">
+                              <span className="text-[9px] font-mono uppercase tracking-widest text-stone-400 block">
+                                O pegar URL directa de la foto:
+                              </span>
+                              <input
+                                type="url"
+                                placeholder="https://images.unsplash.com/..."
+                                value={slideImageInput}
+                                onChange={(e) => setSlideImageInput(e.target.value)}
+                                className="w-full rounded-none border border-stone-borders bg-white px-3 py-2 text-xs text-stone-charcoal focus:border-stone-charcoal outline-hidden"
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Title Input */}
+                        <div className="space-y-1 pt-2">
+                          <label className="text-[9px] font-bold uppercase tracking-widest text-stone-600 block">
+                            Título / Epígrafe (Opcional)
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Ej: Postura de Apertura (Asanas)"
+                            value={slideTitleInput}
+                            onChange={(e) => setSlideTitleInput(e.target.value)}
+                            className="w-full rounded-none border border-stone-borders bg-[#FDFCF8] py-2 px-3 text-xs text-stone-charcoal focus:border-stone-charcoal focus:outline-hidden"
+                          />
+                        </div>
+
+                        {/* Description Input */}
+                        <div className="space-y-1">
+                          <label className="text-[9px] font-bold uppercase tracking-widest text-stone-600 block">
+                            Breve Descripción (Opcional)
+                          </label>
+                          <textarea
+                            rows={2}
+                            placeholder="Ej: Integración consciente de cuerpo y respiración"
+                            value={slideDescInput}
+                            onChange={(e) => setSlideDescInput(e.target.value)}
+                            className="w-full rounded-none border border-stone-borders bg-[#FDFCF8] py-2 px-3 text-xs text-stone-charcoal focus:border-stone-charcoal focus:outline-hidden resize-none"
+                          />
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex gap-2 pt-3">
+                          <button
+                            type="button"
+                            onClick={handleSaveSlideLocally}
+                            disabled={saveLoading || !slideImageInput}
+                            className="flex-1 flex items-center justify-center gap-1.5 rounded-none bg-stone-charcoal hover:bg-emerald-600 text-[#FDFCF8] font-bold text-[9px] uppercase tracking-wider py-3 cursor-pointer transition-colors disabled:opacity-50"
+                          >
+                            <Save className="h-3.5 w-3.5" />
+                            {saveLoading ? 'Guardando...' : 'Guardar Foto'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedSlide(null);
+                              setIsCreatingSlide(false);
+                            }}
+                            className="flex-1 rounded-none border border-stone-borders bg-white hover:bg-stone-sand text-stone-500 font-bold text-[9px] uppercase tracking-wider py-3 cursor-pointer transition-colors"
+                          >
+                            Cancelar
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-20 text-stone-400 font-light text-xs font-serif italic border border-dashed border-stone-borders bg-stone-sand/10">
+                      Selecciona una foto de la lista para editarla o haz clic en "Agregar Nueva Foto".
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Bottom Sync Banner */}
+              <div className="flex flex-col md:flex-row items-center justify-between gap-4 p-6 bg-stone-charcoal text-stone-sand shadow-lg mt-8">
+                <div className="space-y-1 text-center md:text-left">
+                  <h4 className="font-serif text-base tracking-wide text-[#FDFCF8]">
+                    ¿Deseas asegurar la sincronización del carrusel?
+                  </h4>
+                  <p className="text-xs text-stone-300 font-light max-w-2xl leading-relaxed">
+                    Las fotos se guardan automáticamente en tu base de datos y Firestore. Puedes forzar una sincronización manual en cualquier momento con este botón.
+                  </p>
+                </div>
+
+                <button
+                  onClick={() => handleSyncCarouselWithBackend()}
+                  disabled={saveLoading}
+                  className="w-full md:w-auto shrink-0 flex items-center justify-center gap-2 rounded-none bg-[#FDFCF8] hover:bg-stone-gold border border-[#FDFCF8] hover:border-stone-gold px-8 py-4 text-[10px] font-bold uppercase tracking-[0.2em] text-stone-charcoal hover:text-stone-sand active:scale-98 transition-all duration-300 cursor-pointer shadow-md"
+                >
+                  <Save className="h-4 w-4" />
+                  {saveLoading ? 'Sincronizando...' : 'Sincronizar Carrusel'}
+                </button>
+              </div>
+            </div>
           )}
 
           {adminTab === 'blocks' && (

@@ -4,7 +4,7 @@ import path from 'path';
 import fs from 'fs';
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFirestore, doc, getDoc, setDoc } from 'firebase/firestore';
-import { SERVICES, DEFAULT_CAROUSEL_SLIDES, DEFAULT_CAROUSEL_SLIDES_2 } from './src/data';
+import { SERVICES, DEFAULT_CAROUSEL_SLIDES, DEFAULT_CAROUSEL_SLIDES_2, DEFAULT_QUICK_ACCESS_BUTTONS } from './src/data';
 
 async function startServer() {
   const app = express();
@@ -34,6 +34,50 @@ async function startServer() {
   const BOOKINGS_FILE = path.join(process.cwd(), 'bookings.json');
   const CAROUSEL_FILE = path.join(process.cwd(), 'carousel.json');
   const CAROUSEL2_FILE = path.join(process.cwd(), 'carousel2.json');
+  const QUICK_BUTTONS_FILE = path.join(process.cwd(), 'quick_buttons.json');
+  const UPLOADS_DIR = path.join(process.cwd(), 'public', 'uploads');
+
+  if (!fs.existsSync(UPLOADS_DIR)) {
+    fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+  }
+
+  // Helper to extract base64 images to static files in public/uploads
+  const processAndSaveSlideImages = (slides: any[]): any[] => {
+    if (!Array.isArray(slides)) return [];
+    if (!fs.existsSync(UPLOADS_DIR)) {
+      fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+    }
+
+    return slides.map((slide, idx) => {
+      let img = slide.image;
+      const slideId = slide.id || `slide-${Date.now()}-${idx}`;
+
+      if (img && typeof img === 'string' && img.startsWith('data:image/')) {
+        try {
+          const matches = img.match(/^data:image\/([a-zA-Z0-9+]+);base64,(.+)$/);
+          if (matches && matches.length === 3) {
+            const rawExt = matches[1].toLowerCase();
+            const ext = rawExt === 'jpeg' ? 'jpg' : rawExt === 'svg+xml' ? 'svg' : rawExt;
+            const filename = `${slideId}.${ext}`;
+            const filePath = path.join(UPLOADS_DIR, filename);
+            fs.writeFileSync(filePath, Buffer.from(matches[2], 'base64'));
+            img = `/uploads/${filename}`;
+            console.log(`[Storage] Saved uploaded image to ${img}`);
+          }
+        } catch (err) {
+          console.error('Error saving base64 image to disk:', err);
+        }
+      }
+
+      return {
+        ...slide,
+        id: slideId,
+        image: img || '',
+        title: slide.title || '',
+        description: slide.description || ''
+      };
+    });
+  };
 
   // Load or initialize bookings JSON database
   const getPersistedBookings = (): any[] => {
@@ -142,6 +186,32 @@ async function startServer() {
     }
   };
 
+  // Load or initialize quick buttons JSON database
+  const getPersistedQuickButtons = (): any[] => {
+    try {
+      if (fs.existsSync(QUICK_BUTTONS_FILE)) {
+        const fileContent = fs.readFileSync(QUICK_BUTTONS_FILE, 'utf8');
+        return JSON.parse(fileContent);
+      } else {
+        fs.writeFileSync(QUICK_BUTTONS_FILE, JSON.stringify(DEFAULT_QUICK_ACCESS_BUTTONS, null, 2), 'utf8');
+        return DEFAULT_QUICK_ACCESS_BUTTONS;
+      }
+    } catch (err) {
+      console.error('Error reading quick buttons file. Falling back to defaults.', err);
+      return DEFAULT_QUICK_ACCESS_BUTTONS;
+    }
+  };
+
+  const savePersistedQuickButtons = (buttonsList: any[]): boolean => {
+    try {
+      fs.writeFileSync(QUICK_BUTTONS_FILE, JSON.stringify(buttonsList, null, 2), 'utf8');
+      return true;
+    } catch (err) {
+      console.error('Error writing quick buttons file.', err);
+      return false;
+    }
+  };
+
   // --- Cloud Firestore Persistence Layer ---
   const getPersistedServicesAsync = async (): Promise<any[]> => {
     let firestoreError = false;
@@ -209,15 +279,54 @@ async function startServer() {
     return getPersistedCarousel(id);
   };
 
-  const savePersistedCarouselAsync = async (slidesList: any[], id = 1): Promise<boolean> => {
-    savePersistedCarousel(slidesList, id);
+  const savePersistedCarouselAsync = async (slidesList: any[], id = 1): Promise<{ success: boolean; slides: any[] }> => {
+    const processedSlides = processAndSaveSlideImages(slidesList);
+    savePersistedCarousel(processedSlides, id);
     const docName = id === 2 ? 'carousel2' : 'carousel';
     if (db) {
       try {
         const docRef = doc(db, 'appData', docName);
-        await setDoc(docRef, { slides: slidesList, updatedAt: new Date().toISOString() });
+        await setDoc(docRef, { slides: processedSlides, updatedAt: new Date().toISOString() });
+        console.log(`[Firestore] Successfully synced ${docName} to Cloud Firestore!`);
       } catch (err: any) {
-        console.warn(`[Firestore] Notice: saveCarousel ${id} saved to local disk.`);
+        console.warn(`[Firestore] Notice: saveCarousel ${id} saved to local disk:`, err);
+      }
+    }
+    return { success: true, slides: processedSlides };
+  };
+
+  const getPersistedQuickButtonsAsync = async (): Promise<any[]> => {
+    if (db) {
+      try {
+        const docRef = doc(db, 'appData', 'quickButtons');
+        const snap = await getDoc(docRef);
+        if (snap.exists() && snap.data()?.buttons && Array.isArray(snap.data().buttons) && snap.data().buttons.length > 0) {
+          return snap.data().buttons;
+        }
+        if (!snap.exists()) {
+          const localData = getPersistedQuickButtons();
+          if (localData.length > 0) {
+            try {
+              await setDoc(docRef, { buttons: localData, updatedAt: new Date().toISOString() });
+            } catch (e) { /* ignore seed error */ }
+          }
+          return localData;
+        }
+      } catch (err: any) {
+        console.warn('[Firestore] Notice: getQuickButtons falling back to disk persistence.');
+      }
+    }
+    return getPersistedQuickButtons();
+  };
+
+  const savePersistedQuickButtonsAsync = async (buttonsList: any[]): Promise<boolean> => {
+    savePersistedQuickButtons(buttonsList);
+    if (db) {
+      try {
+        const docRef = doc(db, 'appData', 'quickButtons');
+        await setDoc(docRef, { buttons: buttonsList, updatedAt: new Date().toISOString() });
+      } catch (err: any) {
+        console.warn('[Firestore] Notice: saveQuickButtons saved to local disk.');
       }
     }
     return true;
@@ -334,6 +443,7 @@ async function startServer() {
       priceYoga12: s.priceYoga12 !== undefined && s.priceYoga12 !== null ? Number(s.priceYoga12) : undefined,
       intensity: s.intensity || 'Suave',
       highlightNote: s.highlightNote ? String(s.highlightNote).trim() : undefined,
+      backgroundImage: s.backgroundImage ? String(s.backgroundImage).trim() : undefined,
       benefits: Array.isArray(s.benefits) ? s.benefits.filter((b: any) => typeof b === 'string' && b.trim() !== '') : []
     }));
 
@@ -407,16 +517,9 @@ async function startServer() {
       return res.status(400).json({ success: false, message: 'Estructura de datos de carrusel inválida.' });
     }
 
-    const cleanedSlides = slides.map(s => ({
-      id: s.id || `slide-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-      image: s.image || '',
-      title: s.title || '',
-      description: s.description || ''
-    }));
-
-    const success = await savePersistedCarouselAsync(cleanedSlides, targetId);
-    if (success) {
-      res.json({ success: true, carouselId: targetId, slides: cleanedSlides });
+    const result = await savePersistedCarouselAsync(slides, targetId);
+    if (result.success) {
+      res.json({ success: true, carouselId: targetId, slides: result.slides });
     } else {
       res.status(500).json({ success: false, message: 'Error al guardar diapositivas del carrusel.' });
     }
@@ -434,18 +537,83 @@ async function startServer() {
       return res.status(400).json({ success: false, message: 'Estructura de datos de carrusel inválida.' });
     }
 
-    const cleanedSlides = slides.map(s => ({
-      id: s.id || `slide-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-      image: s.image || '',
-      title: s.title || '',
-      description: s.description || ''
-    }));
-
-    const success = await savePersistedCarouselAsync(cleanedSlides, id);
-    if (success) {
-      res.json({ success: true, carouselId: id, slides: cleanedSlides });
+    const result = await savePersistedCarouselAsync(slides, id);
+    if (result.success) {
+      res.json({ success: true, carouselId: id, slides: result.slides });
     } else {
       res.status(500).json({ success: false, message: 'Error al guardar diapositivas del carrusel.' });
+    }
+  });
+
+  // API Route: Direct image upload endpoint (saves base64 to /public/uploads/)
+  app.post('/api/upload', (req, res) => {
+    if (!isValidAdminToken(req)) {
+      return res.status(403).json({ success: false, message: 'No autorizado. Sesión inválida o expirada.' });
+    }
+
+    const { image, name } = req.body;
+    if (!image || typeof image !== 'string' || !image.startsWith('data:image/')) {
+      return res.status(400).json({ success: false, message: 'Imagen base64 requerida.' });
+    }
+
+    try {
+      if (!fs.existsSync(UPLOADS_DIR)) {
+        fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+      }
+
+      const matches = image.match(/^data:image\/([a-zA-Z0-9+]+);base64,(.+)$/);
+      if (!matches || matches.length !== 3) {
+        return res.status(400).json({ success: false, message: 'Formato de imagen inválido.' });
+      }
+
+      const rawExt = matches[1].toLowerCase();
+      const ext = rawExt === 'jpeg' ? 'jpg' : rawExt === 'svg+xml' ? 'svg' : rawExt;
+      const safePrefix = (name || 'upload').replace(/[^a-zA-Z0-9_-]/g, '_');
+      const filename = `${safePrefix}-${Date.now()}.${ext}`;
+      const filePath = path.join(UPLOADS_DIR, filename);
+
+      fs.writeFileSync(filePath, Buffer.from(matches[2], 'base64'));
+      const publicUrl = `/uploads/${filename}`;
+      console.log(`[Upload API] Saved image to ${publicUrl}`);
+
+      res.json({ success: true, url: publicUrl, filename });
+    } catch (err: any) {
+      console.error('Upload API Error:', err);
+      res.status(500).json({ success: false, message: err.message || 'Error al guardar la imagen.' });
+    }
+  });
+
+  // API Route: Fetch quick access buttons
+  app.get('/api/quick-buttons', async (req, res) => {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    const buttons = await getPersistedQuickButtonsAsync();
+    res.json({ success: true, buttons });
+  });
+
+  // API Route: Update quick access buttons (requires admin authentication)
+  app.post('/api/quick-buttons', async (req, res) => {
+    if (!isValidAdminToken(req)) {
+      return res.status(403).json({ success: false, message: 'No autorizado. Sesión inválida o expirada.' });
+    }
+
+    const { buttons } = req.body;
+    if (!Array.isArray(buttons)) {
+      return res.status(400).json({ success: false, message: 'Estructura de datos inválida.' });
+    }
+
+    const cleanedButtons = buttons.map(b => ({
+      id: b.id || `btn-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      title: String(b.title || '').trim(),
+      subtitle: b.subtitle ? String(b.subtitle).trim() : '',
+      image: String(b.image || '').trim(),
+      targetSection: b.targetSection ? String(b.targetSection).trim() : ''
+    }));
+
+    const success = await savePersistedQuickButtonsAsync(cleanedButtons);
+    if (success) {
+      res.json({ success: true, buttons: cleanedButtons });
+    } else {
+      res.status(500).json({ success: false, message: 'Error al guardar los botones de acceso rápido.' });
     }
   });
 

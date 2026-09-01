@@ -18,6 +18,7 @@ export interface Service {
   intensity?: 'Suave' | 'Moderada' | 'Intensa' | 'Restaurativa' | 'Equilibrio' | 'Sintonización Energética';
   benefits: string[];
   highlightNote?: string;
+  backgroundImage?: string; // URL or base64 data for card background
 }
 
 export interface Booking {
@@ -64,4 +65,12 @@ export interface CarouselSlide {
   image: string;
   title: string;
   description: string;
+}
+
+export interface QuickAccessButton {
+  id: string;
+  title: string;
+  subtitle?: string;
+  image: string;
+  targetSection?: string;
 }

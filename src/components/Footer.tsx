@@ -17,7 +17,7 @@ export default function Footer({ onAdminClick }: FooterProps) {
       
       {/* Extreme bottom copyright and small icons */}
       <div className="mx-auto max-w-7xl px-6 sm:px-8 pt-4 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-stone-500">
-        <p>© 2026 Clara Chiaravalli. Yoga & Shiatsu</p>
+        <p>© 2026 Maria Clara . Yoga</p>
         <div className="flex items-center gap-4.5">
           {onAdminClick && (
             <button 

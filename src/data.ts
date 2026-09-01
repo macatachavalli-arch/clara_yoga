@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Service, Review, TeacherInfo, CarouselSlide } from './types';
+import { Service, Review, TeacherInfo, CarouselSlide, QuickAccessButton } from './types';
 
 export const SERVICES: Service[] = [
   {
@@ -79,11 +79,12 @@ export const TEACHERS: TeacherInfo[] = [
     id: 'clara',
     name: 'María Clara Chiaravalli',
     role: 'Profesora de Yoga • Terapeuta Shiatsu • Maestra de Reiki',
-    bio: `Nací en la ciudad de La Plata, Bs As, Argentina. Soy Diseñadora en Comunicación Visual e Ilustradora. Desde muy pequeña me acompañan los dibujos. Me siento muy afortunada de poder expresar a través de la ilustración. Me inspira profundamente el sentido de transformación, la transmutación, la conexión con lo divino. Lo oculto que se deja ver. Las magias. La Luna y el Sol.
-Como profesora de Yoga, me expreso y me encuentro a través del movimiento, la respiración, los sonidos, el silencio y la quietud. La práctica que propongo tiene como finalidad la autorregulación y el equilibrio mente cuerpo espíritu. Comparto y enseño toda la experiencia y el recorrido en mis años de práctica y estudio. 
+    bio: `Nací en la ciudad de La Plata, Bs As, Argentina. Soy Diseñadora en Comunicación Visual e Ilustradora. Desde muy pequeña me acompañan los dibujos. Me siento muy afortunada de poder expresar a través de la ilustración.
+En el arte como en las prácticas hacia el equilibrio psicofísico, me inspiran profundamente el sentido de transformación, la transmutación, la conexión energética. Soy terapeuta Shiatsu Zen y maestra de Reiki.
 
-Mi camino en el Yoga comenzó en el año 2005 con la práctica regular de diversos estilos como Vinyasa Yoga, Yoga Integral, Ashtanga Vinyasa Yoga y Hatha Yoga. Brindo prácticas en mi ciudad natal desde el año 2018. Realicé el profesorado de Hatha Yoga, y luego la formación de Antropotécnica con Santiago Boumpadre, quien aportó a mis años de práctica un contenido profundo en el estudio mente cuerpo validado por la ciencia. Mis prácticas hoy tienen bases sólidas sobre este método. Junto a Santiago también realicé talleres y cursos en simultáneo a la formación: Om y Neuronciencia, Respiración y Emociones, Neurociencia de los Chakras y Neurociencia de la Meditación.
-Soy terapeuta Shiatsu y maestra de Reiki. 
+Mi camino en el Yoga comenzó en el año 2005 con la práctica regular de diversos estilos como Vinyasa Yoga, Yoga Integral, Ashtanga Vinyasa Yoga y Hatha Yoga. Brindo prácticas en mi ciudad natal desde el año 2018. La práctica que propongo tiene como finalidad la autorregulación y el equilibrio mente cuerpo espíritu; fomentar la escucha interna y el autoconocimiento.
+
+Realicé el profesorado de Hatha Yoga, y luego la formación de Antropotécnica con Santiago Boumpadre, quien aportó a mis años de práctica un contenido profundo en el estudio mente cuerpo validado por la ciencia. Mis prácticas hoy tienen bases sólidas sobre este método. Junto a Santiago también realicé talleres y cursos en simultáneo a la formación: Om y Neuronciencia, Respiración y Emociones, Neurociencia de los Chakras y Neurociencia de la Meditación.
 
 La práctica sostenida, el equilibrio del flujo energético, el movimiento, la respiración y la meditación como medicina para la vida moderna.`,
     specialty: 'Hatha Yoga, Vinyasa Flow, Yoga Integral, Terapia Shiatsu y Reiki',
@@ -179,3 +180,42 @@ export const DEFAULT_CAROUSEL_SLIDES_2: CarouselSlide[] = [
     description: 'Espacios de aprendizaje y profundización en el cuidado consciente.'
   }
 ];
+
+export const DEFAULT_QUICK_ACCESS_BUTTONS: QuickAccessButton[] = [
+  {
+    id: 'btn-yoga',
+    title: 'YOGA',
+    subtitle: 'Prácticas & Horarios',
+    image: 'https://images.unsplash.com/photo-1545205597-3d9d02c29597?auto=format&fit=crop&q=80&w=800',
+    targetSection: '#yoga-explainer'
+  },
+  {
+    id: 'btn-shiatsu',
+    title: 'SHIATSU ZEN',
+    subtitle: 'Masaje Japonés',
+    image: 'https://images.unsplash.com/photo-1518611012118-696072aa579a?auto=format&fit=crop&q=80&w=800',
+    targetSection: '#services-section'
+  },
+  {
+    id: 'btn-reiki',
+    title: 'REIKI',
+    subtitle: 'Armonización Usui',
+    image: 'https://images.unsplash.com/photo-1512290900672-1f02e6005721?auto=format&fit=crop&q=80&w=800',
+    targetSection: '#services-section'
+  },
+  {
+    id: 'btn-talleres',
+    title: 'TALLERES',
+    subtitle: 'Encuentros & Retiros',
+    image: 'https://images.unsplash.com/photo-1599447421416-3414500d18a5?auto=format&fit=crop&q=80&w=800',
+    targetSection: '#horarios-section'
+  },
+  {
+    id: 'btn-arte',
+    title: 'ARTE',
+    subtitle: 'Expresión Consciente',
+    image: 'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?auto=format&fit=crop&q=80&w=800',
+    targetSection: '#contact-section'
+  }
+];
+

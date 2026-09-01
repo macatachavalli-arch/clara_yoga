@@ -55,12 +55,15 @@ export default function ContactSection() {
   };
 
   return (
-    <section id="contact-section" className="py-20 h-[630px] bg-[#232323] text-stone-200 scroll-mt-20 flex flex-col justify-center">
-      <div className="mx-auto max-w-3xl px-6 sm:px-8 w-full">
+    <section 
+      id="contact-section" 
+      className="py-8 sm:py-10 md:py-12 bg-[#232323] text-stone-200 scroll-mt-[48px] md:scroll-mt-[52px] min-h-[calc(100dvh-48px)] md:min-h-[calc(100dvh-52px)] flex flex-col justify-center"
+    >
+      <div className="mx-auto max-w-3xl px-6 sm:px-8 w-full my-auto">
         
         <div className="space-y-6">
           <div className="text-center">
-            <h2 className="font-serif text-3xl font-light text-stone-200 italic sm:text-4xl leading-tight">Contacto</h2>
+            <h2 className="font-serif text-3xl font-light text-stone-200 sm:text-4xl leading-tight italic">Contacto</h2>
           </div>
 
           <AnimatePresence mode="wait">
@@ -78,7 +81,7 @@ export default function ContactSection() {
                   {/* Name */}
                   <div className="space-y-1">
                     <label htmlFor="contact-name" className="text-[10px] font-bold uppercase tracking-widest text-[#000000] block font-mono">
-                      Nombre Completo *
+                      Nombre *
                     </label>
                     <div className="relative">
                       <User className="absolute left-3 top-3.5 h-4 w-4 text-stone-400" />

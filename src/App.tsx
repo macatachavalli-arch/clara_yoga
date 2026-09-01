@@ -7,7 +7,9 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import Navbar from './components/Navbar';
 import Hero from './components/Hero';
-import InfoSection from './components/InfoSection';
+import YogaExplainerSection from './components/YogaExplainerSection';
+import EstilosPracticaSection from './components/EstilosPracticaSection';
+import HorariosSection from './components/HorariosSection';
 import ServicesPanel from './components/ServicesPanel';
 import BookingForm from './components/BookingForm';
 import MyReservations from './components/MyReservations';
@@ -16,12 +18,14 @@ import AdminPanel from './components/AdminPanel';
 import TherapeuticTeam from './components/TherapeuticTeam';
 import ContactSection from './components/ContactSection';
 import ZenBackgroundAudio from './components/ZenBackgroundAudio';
-import { SERVICES } from './data';
-import { Booking, Service, BlockedSlot } from './types';
+import FloatingNav from './components/FloatingNav';
+import { SERVICES, DEFAULT_CAROUSEL_SLIDES } from './data';
+import { Booking, Service, BlockedSlot, CarouselSlide } from './types';
 import { 
   getServicesFromFirestore, 
   getBlockedSlotsFromFirestore, 
-  getBookingsFromFirestore 
+  getBookingsFromFirestore,
+  getCarouselFromFirestore
 } from './lib/firestoreStorage';
 
 export default function App() {
@@ -43,6 +47,20 @@ export default function App() {
     }
     return SERVICES;
   });
+
+  const [yogaSlides, setYogaSlides] = useState<CarouselSlide[]>(() => {
+    try {
+      const cached = localStorage.getItem('clara_cached_carousel1');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {
+      console.warn(e);
+    }
+    return DEFAULT_CAROUSEL_SLIDES;
+  });
+
   const [blockedSlots, setBlockedSlots] = useState<BlockedSlot[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [isAdminActive, setIsAdminActive] = useState<boolean>(false);
@@ -68,6 +86,29 @@ export default function App() {
 
       const fsServices = await getServicesFromFirestore();
       setServices(fsServices);
+    };
+
+    const fetchCarousel = async () => {
+      try {
+        const resp = await fetch('/api/carousel/1', { cache: 'no-store' });
+        if (resp.ok) {
+          const data = await resp.json();
+          if (data.success && Array.isArray(data.slides) && data.slides.length > 0) {
+            setYogaSlides(data.slides);
+            try {
+              localStorage.setItem('clara_cached_carousel1', JSON.stringify(data.slides));
+            } catch (e) { console.warn(e); }
+            return;
+          }
+        }
+      } catch (err) {
+        console.warn('Backend API unavailable. Fetching carousel from Firestore.', err);
+      }
+
+      const fsSlides = await getCarouselFromFirestore(1);
+      if (fsSlides && fsSlides.length > 0) {
+        setYogaSlides(fsSlides);
+      }
     };
 
     const fetchBlockedSlots = async () => {
@@ -113,6 +154,7 @@ export default function App() {
     };
 
     fetchServices();
+    fetchCarousel();
     fetchBlockedSlots();
     fetchBookings();
   }, [refreshFlag]);
@@ -178,9 +220,17 @@ export default function App() {
           onClose={() => setIsAdminActive(false)}
           bookings={bookings}
           onBookingsUpdated={(updated) => setBookings(updated)}
+          carouselSlides={yogaSlides}
+          onCarouselUpdated={(updated) => setYogaSlides(updated)}
         />
       ) : (
         <>
+          {/* Desktop & Mobile Navigation (Desktop Header above Hero + Mobile Bar) */}
+          <FloatingNav 
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+          />
+
           {/* Main Dynamic Workspace body */}
           <main className="flex-grow">
             <AnimatePresence mode="wait">
@@ -199,41 +249,22 @@ export default function App() {
                     onMyBookings={() => setActiveTab('my-bookings')}
                   />
                   
-                  {/* Full-width banner image before InfoSection */}
-                  <div className="w-full h-[250px] sm:h-[350px] md:h-[470px] overflow-hidden bg-stone-900 relative">
-                    <img 
-                      src="https://i.imgur.com/NAsTvBt.jpeg" 
-                      alt="Yoga y Shiatsu Zen" 
-                      referrerPolicy="no-referrer"
-                      className="w-full h-full object-cover object-center"
-                    />
-                  </div>
+                  {/* Screen 2: Yoga (Introducción y Método con Carrusel de 3 fotos) */}
+                  <YogaExplainerSection slides={yogaSlides} />
 
-                  <InfoSection services={services} />
+                  {/* Screen 3: Estilos de Práctica */}
+                  <EstilosPracticaSection />
 
-                  {/* Full-width banner image between Yoga and Reservas */}
-                  <div className="w-full h-[250px] sm:h-[350px] md:h-[470px] overflow-hidden bg-stone-900 relative">
-                    <img 
-                      src="https://i.imgur.com/EOITdTC.jpeg" 
-                      alt="Yoga y Shiatsu Zen" 
-                      referrerPolicy="no-referrer"
-                      className="w-full h-full object-cover object-center"
-                    />
-                  </div>
+                  {/* Screen 4: Horarios & Abonos */}
+                  <HorariosSection services={services} />
 
+                  {/* Screen 5: Sesiones & Terapias */}
                   <ServicesPanel services={services} onSelectService={handleSelectServiceDirectly} />
                   
-                  {/* Full-width image banner between Yoga & Sesiones and Sobre mí */}
-                  <div className="w-full h-[250px] sm:h-[350px] md:h-[470px] overflow-hidden bg-stone-900 relative">
-                    <img 
-                      src="https://i.imgur.com/ZhcTfPP.jpeg" 
-                      alt="Yoga y Shiatsu Zen" 
-                      referrerPolicy="no-referrer"
-                      className="w-full h-full object-cover object-center"
-                    />
-                  </div>
-
+                  {/* Screen 6: Bío (Clara) */}
                   <TherapeuticTeam />
+
+                  {/* Screen 7: Contacto */}
                   <ContactSection />
                 </motion.div>
               )}
@@ -280,7 +311,9 @@ export default function App() {
           </main>
 
           {/* Structured Footer / FAQ Panel */}
-          <Footer onAdminClick={() => setIsAdminActive(true)} />
+          <div className="pb-16 md:pb-0">
+            <Footer onAdminClick={() => setIsAdminActive(true)} />
+          </div>
         </>
       )}
 
