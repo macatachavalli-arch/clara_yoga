@@ -108,8 +108,14 @@ export default function ServicesPanel({ services, onSelectService }: ServicesPan
                     ) : (
                       Number(service.duration) > 0 && (
                         <div className="mt-1 mb-3.5 flex items-center gap-4 text-xs font-mono text-stone-500 pb-1">
-                          <span className="flex items-center gap-1 font-sans text-stone-500">
-                            <Clock className="h-3.5 w-3.5 text-stone-400" />
+                          <span 
+                            className="flex items-center gap-1 font-sans"
+                            style={service.id === 'shiatsu-hot-stones' || service.id === 'shiatsu-tradicional' ? { color: '#efefef' } : { color: '#78716c' }}
+                          >
+                            <Clock 
+                              className="h-3.5 w-3.5" 
+                              style={service.id === 'shiatsu-tradicional' || service.id === 'shiatsu-hot-stones' ? { color: '#efefef' } : { color: '#a8a29e' }} 
+                            />
                             {service.duration} minutos
                           </span>
                         </div>

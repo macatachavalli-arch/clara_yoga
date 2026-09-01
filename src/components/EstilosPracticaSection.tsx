@@ -54,6 +54,7 @@ export default function EstilosPracticaSection() {
                 key={estilo.id}
                 id={`estilo-card-${estilo.id}`}
                 className="bg-white p-7 sm:p-8 rounded-xl shadow-xs transition-all duration-300 flex flex-col justify-between"
+                style={{ borderWidth: '1px', borderColor: '#474747', borderStyle: 'solid' }}
               >
                 <div>
                   {/* Category / Energy Pill */}
