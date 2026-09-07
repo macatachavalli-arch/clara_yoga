@@ -42,7 +42,7 @@ async function startServer() {
     fs.mkdirSync(UPLOADS_DIR, { recursive: true });
   }
 
-  // Helper to extract base64 images for practice styles
+  // Helper to process practice styles images while preserving base64 data URLs in Firestore
   const processAndSaveEstilosImages = (estilos: any[]): any[] => {
     if (!Array.isArray(estilos)) return [];
     if (!fs.existsSync(UPLOADS_DIR)) {
@@ -53,6 +53,8 @@ async function startServer() {
       let img = item.image;
       const itemId = item.id || `estilo-${Date.now()}-${idx}`;
 
+      // Save a local disk backup copy if it is base64, but PRESERVE the base64 data URL
+      // in 'img' so it persists directly in Cloud Firestore and works on all devices and computers
       if (img && typeof img === 'string' && img.startsWith('data:image/')) {
         try {
           const matches = img.match(/^data:image\/([a-zA-Z0-9+]+);base64,(.+)$/);
@@ -62,11 +64,15 @@ async function startServer() {
             const filename = `estilo-${itemId}.${ext}`;
             const filePath = path.join(UPLOADS_DIR, filename);
             fs.writeFileSync(filePath, Buffer.from(matches[2], 'base64'));
-            img = `/uploads/${filename}`;
-            console.log(`[Storage] Saved uploaded estilo image to ${img}`);
+
+            const distUploads = path.join(process.cwd(), 'dist', 'uploads');
+            if (fs.existsSync(distUploads)) {
+              fs.writeFileSync(path.join(distUploads, filename), Buffer.from(matches[2], 'base64'));
+            }
+            console.log(`[Storage] Saved disk backup for estilo image: ${filename}`);
           }
         } catch (err) {
-          console.error('Error saving estilo base64 image to disk:', err);
+          console.error('Error saving estilo base64 backup image to disk:', err);
         }
       }
 
@@ -872,6 +878,13 @@ async function startServer() {
     }
     next();
   });
+
+  // Explicitly serve uploads from public/uploads AND dist/uploads before anything else
+  app.use('/uploads', express.static(path.join(process.cwd(), 'public', 'uploads')));
+  const distUploadsDir = path.join(process.cwd(), 'dist', 'uploads');
+  if (fs.existsSync(distUploadsDir)) {
+    app.use('/uploads', express.static(distUploadsDir));
+  }
 
   // Serve files from public folder
   app.use(express.static(path.join(process.cwd(), 'public')));

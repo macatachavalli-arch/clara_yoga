@@ -914,37 +914,14 @@ export default function AdminPanel({
     setStatusMessage(null);
 
     try {
-      const base64 = await compressImage(file, 1920, 1080, 0.85);
-
-      try {
-        const activeToken = token || localStorage.getItem('clara_admin_token') || 'clara_admin_session_token_2026';
-        const uploadResp = await fetch('/api/upload', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${activeToken}`
-          },
-          body: JSON.stringify({
-            image: base64,
-            name: `estilo-${Date.now()}`
-          })
-        });
-
-        if (uploadResp.ok) {
-          const uploadData = await uploadResp.json();
-          if (uploadData.success && uploadData.url) {
-            setEstiloImageInput(uploadData.url);
-            setStatusMessage({ text: 'Foto subida y guardada con éxito.', isError: false });
-            setIsUploadingEstiloImage(false);
-            return;
-          }
-        }
-      } catch (uploadErr) {
-        console.warn('Direct upload endpoint failed, falling back to compressed base64:', uploadErr);
-      }
-
+      // Compress and optimize image to high definition yet compact base64 data URL
+      // This guarantees the image is saved directly in Cloud Firestore and renders on ALL computers and phones without broken links
+      const base64 = await compressImage(file, 1280, 800, 0.80);
       setEstiloImageInput(base64);
-      setStatusMessage({ text: 'Foto procesada correctamente y lista para guardar.', isError: false });
+      setStatusMessage({ 
+        text: 'Foto lista y optimizada. Presiona "Guardar cambios del tarjetón" abajo para sincronizarla y publicarla en todos los dispositivos.', 
+        isError: false 
+      });
     } catch (err) {
       console.error(err);
       setStatusMessage({ text: 'Error al procesar la imagen seleccionada.', isError: true });

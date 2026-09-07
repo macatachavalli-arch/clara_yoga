@@ -93,6 +93,13 @@ export default function EstilosPracticaSection({ estilos, onAdminClick }: Estilo
                   alt={currentItem.title}
                   className="w-full h-full object-cover select-none"
                   referrerPolicy="no-referrer"
+                  onError={(e) => {
+                    const target = e.currentTarget;
+                    const fallback = DEFAULT_PRACTICE_STYLES[activeIndex % DEFAULT_PRACTICE_STYLES.length]?.image || 'https://images.unsplash.com/photo-1506126613408-eca07ce68773?auto=format&fit=crop&q=80&w=1200';
+                    if (target.src !== fallback) {
+                      target.src = fallback;
+                    }
+                  }}
                 />
               </motion.div>
             </AnimatePresence>
