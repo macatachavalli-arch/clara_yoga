@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Service, Review, TeacherInfo, CarouselSlide, QuickAccessButton } from './types';
+import { Service, Review, TeacherInfo, CarouselSlide, QuickAccessButton, PracticeStyle } from './types';
 
 export const SERVICES: Service[] = [
   {
@@ -216,6 +216,30 @@ export const DEFAULT_QUICK_ACCESS_BUTTONS: QuickAccessButton[] = [
     subtitle: 'Expresión Consciente',
     image: 'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?auto=format&fit=crop&q=80&w=800',
     targetSection: '#contacto'
+  }
+];
+
+export const DEFAULT_PRACTICE_STYLES: PracticeStyle[] = [
+  {
+    id: 'yin-yang-yoga',
+    title: 'Yin & Yang Yoga',
+    energy: 'EQUILIBRIO',
+    image: 'https://images.unsplash.com/photo-1506126613408-eca07ce68773?auto=format&fit=crop&q=80&w=1200',
+    description: 'En estas prácticas trabajamos el equilibrio entre la pausa y el movimiento, integrando las dos energías que nos habitan. Vamos a explorar los opuestos complementarios Yin Yang buscando variables entre la acción y la quietud, el movimiento y la pausa.'
+  },
+  {
+    id: 'vinyasa-yoga',
+    title: 'Vinyasa Yoga',
+    energy: 'DINÁMICO • YANG',
+    image: 'https://images.unsplash.com/photo-1545205597-3d9d02c29597?auto=format&fit=crop&q=80&w=1200',
+    description: 'Secuencias dinámicas que enlazan el movimiento continuo con el ritmo de la respiración. Práctica grupal con una mirada activa a nivel individual, con ajustes específicos según anatomía, energía e historia de cada cuerpo. Cada practicante evoluciona a su ritmo.'
+  },
+  {
+    id: 'antropotecnica',
+    title: 'Antropotécnica',
+    energy: 'MOVILIDAD Y FUERZA',
+    image: 'https://images.unsplash.com/photo-1518611012118-696072aa579a?auto=format&fit=crop&q=80&w=1200',
+    description: 'Práctica con fundamentos teóricos basados en la evidencia científica mas actual. Integramos fuerza, movilidad articular y flexibilidad activa, dedicándole además un momento importante a la práctica de la Meditación.'
   }
 ];
 

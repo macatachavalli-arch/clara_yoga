@@ -3,24 +3,27 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect, FormEvent, ChangeEvent } from 'react';
+import { useState, useEffect, useRef, FormEvent, ChangeEvent } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Lock, KeyRound, ShieldCheck, PlusCircle, Trash2, Edit3, 
   Save, Undo2, AlertCircle, CheckCircle, Sparkles, X, ChevronRight, FileText, Plus, Calendar, Clock,
   User, Phone, Upload, Image as ImageIcon, ArrowUp, ArrowDown
 } from 'lucide-react';
-import { Service, BlockedSlot, Booking, CarouselSlide } from '../types';
-import { DEFAULT_CAROUSEL_SLIDES } from '../data';
+import { Service, BlockedSlot, Booking, CarouselSlide, PracticeStyle } from '../types';
+import { DEFAULT_CAROUSEL_SLIDES, DEFAULT_PRACTICE_STYLES } from '../data';
 import { 
   saveServicesToFirestore, 
   saveBlockedSlotsToFirestore, 
   saveBookingsToFirestore,
   saveCarouselToFirestore,
-  getCarouselFromFirestore
+  getCarouselFromFirestore,
+  saveEstilosToFirestore,
+  getEstilosFromFirestore
 } from '../lib/firestoreStorage';
 
 interface AdminPanelProps {
+  initialTab?: 'services' | 'carousel' | 'blocks' | 'bookings' | 'estilos';
   services: Service[];
   onServicesUpdated: (updatedServices: Service[]) => void;
   blockedSlots: BlockedSlot[];
@@ -30,6 +33,8 @@ interface AdminPanelProps {
   onBookingsUpdated: (updatedBookings: Booking[]) => void;
   carouselSlides?: CarouselSlide[];
   onCarouselUpdated?: (updatedSlides: CarouselSlide[]) => void;
+  estilos?: PracticeStyle[];
+  onEstilosUpdated?: (updatedEstilos: PracticeStyle[]) => void;
 }
 
 // Pre-defined templates for creating new service cards
@@ -137,7 +142,10 @@ export default function AdminPanel({
   bookings,
   onBookingsUpdated,
   carouselSlides,
-  onCarouselUpdated
+  onCarouselUpdated,
+  estilos,
+  onEstilosUpdated,
+  initialTab
 }: AdminPanelProps) {
   // Authentication states
   const [passwordInput, setPasswordInput] = useState<string>('');
@@ -146,8 +154,43 @@ export default function AdminPanel({
   const [loginError, setLoginError] = useState<string>('');
   const [isLoginLoading, setIsLoginLoading] = useState<boolean>(false);
 
-  // Toggle active administration tab: 'services' | 'carousel' | 'blocks' | 'bookings'
-  const [adminTab, setAdminTab] = useState<'services' | 'carousel' | 'blocks' | 'bookings'>('services');
+  // Toggle active administration tab: 'services' | 'carousel' | 'blocks' | 'bookings' | 'estilos'
+  const [adminTab, setAdminTab] = useState<'services' | 'carousel' | 'blocks' | 'bookings' | 'estilos'>(initialTab || 'services');
+
+  useEffect(() => {
+    if (initialTab) {
+      setAdminTab(initialTab);
+    }
+  }, [initialTab]);
+
+  // Estilos de Práctica (Slider Dinámico) States
+  const [estilosList, setEstilosList] = useState<PracticeStyle[]>(() => {
+    if (estilos && estilos.length > 0) return estilos;
+    try {
+      const cached = localStorage.getItem('clara_cached_estilos');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {}
+    return DEFAULT_PRACTICE_STYLES;
+  });
+  const [selectedEstilo, setSelectedEstilo] = useState<PracticeStyle | null>(null);
+  const [isCreatingEstilo, setIsCreatingEstilo] = useState<boolean>(false);
+  const [estiloTitleInput, setEstiloTitleInput] = useState<string>('');
+  const [estiloEnergyInput, setEstiloEnergyInput] = useState<string>('');
+  const [estiloDescInput, setEstiloDescInput] = useState<string>('');
+  const [estiloImageInput, setEstiloImageInput] = useState<string>('');
+  const [isUploadingEstiloImage, setIsUploadingEstiloImage] = useState<boolean>(false);
+  const [deleteConfirmEstiloId, setDeleteConfirmEstiloId] = useState<string | null>(null);
+  const estiloEditorRef = useRef<HTMLDivElement>(null);
+
+  // Sync prop changes for estilos
+  useEffect(() => {
+    if (estilos && estilos.length > 0) {
+      setEstilosList(estilos);
+    }
+  }, [estilos]);
 
   // Yoga Carousel Management states
   const [carouselSlidesList, setCarouselSlidesList] = useState<CarouselSlide[]>(() => {
@@ -817,6 +860,206 @@ export default function AdminPanel({
     handleSyncCarouselWithBackend(updated);
   };
 
+  // --- Estilos de Práctica (Dynamic Slider) Handlers ---
+  const handleStartCreateEstilo = () => {
+    setSelectedEstilo({
+      id: `estilo-${Date.now()}`,
+      title: '',
+      energy: '',
+      description: '',
+      image: ''
+    });
+    setIsCreatingEstilo(true);
+    setEstiloTitleInput('');
+    setEstiloEnergyInput('');
+    setEstiloDescInput('');
+    setEstiloImageInput('');
+    setStatusMessage(null);
+    setTimeout(() => {
+      estiloEditorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 60);
+  };
+
+  const handleStartEditEstilo = (estilo: PracticeStyle) => {
+    setSelectedEstilo(estilo);
+    setIsCreatingEstilo(false);
+    setEstiloTitleInput(estilo.title || '');
+    setEstiloEnergyInput(estilo.energy || '');
+    setEstiloDescInput(estilo.description || '');
+    setEstiloImageInput(estilo.image || '');
+    setStatusMessage(null);
+    setTimeout(() => {
+      estiloEditorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 60);
+  };
+
+  // Auto-select first estilo when entering 'estilos' tab if none selected
+  useEffect(() => {
+    if (adminTab === 'estilos' && !selectedEstilo && estilosList.length > 0) {
+      handleStartEditEstilo(estilosList[0]);
+    }
+  }, [adminTab]);
+
+  const handleUploadEstiloImage = async (e: ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const file = files[0];
+    if (!file.type.startsWith('image/')) {
+      setStatusMessage({ text: 'Por favor selecciona un archivo de imagen válido (JPG, PNG o WebP).', isError: true });
+      return;
+    }
+
+    setIsUploadingEstiloImage(true);
+    setStatusMessage(null);
+
+    try {
+      const base64 = await compressImage(file, 1920, 1080, 0.85);
+
+      try {
+        const activeToken = token || localStorage.getItem('clara_admin_token') || 'clara_admin_session_token_2026';
+        const uploadResp = await fetch('/api/upload', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${activeToken}`
+          },
+          body: JSON.stringify({
+            image: base64,
+            name: `estilo-${Date.now()}`
+          })
+        });
+
+        if (uploadResp.ok) {
+          const uploadData = await uploadResp.json();
+          if (uploadData.success && uploadData.url) {
+            setEstiloImageInput(uploadData.url);
+            setStatusMessage({ text: 'Foto subida y guardada con éxito.', isError: false });
+            setIsUploadingEstiloImage(false);
+            return;
+          }
+        }
+      } catch (uploadErr) {
+        console.warn('Direct upload endpoint failed, falling back to compressed base64:', uploadErr);
+      }
+
+      setEstiloImageInput(base64);
+      setStatusMessage({ text: 'Foto procesada correctamente y lista para guardar.', isError: false });
+    } catch (err) {
+      console.error(err);
+      setStatusMessage({ text: 'Error al procesar la imagen seleccionada.', isError: true });
+    } finally {
+      setIsUploadingEstiloImage(false);
+    }
+  };
+
+  const handleSyncEstilosWithBackend = async (listToSync = estilosList) => {
+    setSaveLoading(true);
+    setStatusMessage(null);
+
+    let finalEstilos = listToSync;
+
+    try {
+      const activeToken = token || localStorage.getItem('clara_admin_token') || 'clara_admin_session_token_2026';
+      const resp = await fetch('/api/estilos', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${activeToken}`
+        },
+        body: JSON.stringify({ estilos: listToSync })
+      });
+
+      if (resp.ok) {
+        const data = await resp.json();
+        if (data.success && Array.isArray(data.estilos)) {
+          finalEstilos = data.estilos;
+          setEstilosList(data.estilos);
+          if (onEstilosUpdated) onEstilosUpdated(data.estilos);
+        }
+      }
+    } catch (err) {
+      console.warn('Backend API unavailable. Saving directly to Firestore and local cache.', err);
+    }
+
+    // Save final processed estilos to Firestore & local storage
+    await saveEstilosToFirestore(finalEstilos);
+
+    if (onEstilosUpdated) {
+      onEstilosUpdated(finalEstilos);
+    }
+
+    setStatusMessage({ 
+      text: '¡Estilos de práctica guardados y sincronizados con éxito en la base de datos!', 
+      isError: false 
+    });
+    setSaveLoading(false);
+  };
+
+  const handleSaveEstiloLocally = async () => {
+    if (!estiloImageInput.trim()) {
+      setStatusMessage({ text: 'Por favor, sube una foto o ingresa el enlace de la imagen.', isError: true });
+      return;
+    }
+    if (!estiloTitleInput.trim()) {
+      setStatusMessage({ text: 'Por favor, ingresa el título del estilo de práctica.', isError: true });
+      return;
+    }
+
+    if (!selectedEstilo) return;
+
+    const safeId = selectedEstilo.id || `estilo-${Date.now()}`;
+    const updatedEstilo: PracticeStyle = {
+      id: safeId,
+      title: estiloTitleInput.trim(),
+      energy: estiloEnergyInput.trim(),
+      description: estiloDescInput.trim(),
+      image: estiloImageInput.trim()
+    };
+
+    let updatedList: PracticeStyle[];
+    if (isCreatingEstilo) {
+      updatedList = [...estilosList, updatedEstilo];
+    } else {
+      updatedList = estilosList.map(s => (s.id === selectedEstilo.id || (selectedEstilo.title && s.title === selectedEstilo.title)) ? updatedEstilo : s);
+    }
+
+    setEstilosList(updatedList);
+    setSelectedEstilo(updatedEstilo);
+    setIsCreatingEstilo(false);
+
+    // Sync with backend / Firestore immediately
+    await handleSyncEstilosWithBackend(updatedList);
+    setStatusMessage({
+      text: `¡Tarjetón "${updatedEstilo.title}" guardado y actualizado con éxito!`,
+      isError: false
+    });
+  };
+
+  const handleDeleteEstilo = (estiloId: string) => {
+    const updatedList = estilosList.filter(s => s.id !== estiloId);
+    setEstilosList(updatedList);
+    setDeleteConfirmEstiloId(null);
+    if (selectedEstilo?.id === estiloId) {
+      setSelectedEstilo(null);
+      setIsCreatingEstilo(false);
+    }
+    handleSyncEstilosWithBackend(updatedList);
+  };
+
+  const handleMoveEstilo = (index: number, direction: 'up' | 'down') => {
+    const newIdx = direction === 'up' ? index - 1 : index + 1;
+    if (newIdx < 0 || newIdx >= estilosList.length) return;
+
+    const updated = [...estilosList];
+    const temp = updated[index];
+    updated[index] = updated[newIdx];
+    updated[newIdx] = temp;
+
+    setEstilosList(updated);
+    handleSyncEstilosWithBackend(updated);
+  };
+
   return (
     <div id="admin-panel-container" className="mx-auto max-w-5xl px-4 py-12">
       
@@ -956,6 +1199,22 @@ export default function AdminPanel({
               }`}
             >
               Reservas de Alumnos 📝
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setAdminTab('estilos');
+                setStatusMessage(null);
+                setSelectedEstilo(null);
+                setIsCreatingEstilo(false);
+              }}
+              className={`px-5 py-3.5 text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer rounded-none border-b-2 ${
+                adminTab === 'estilos'
+                  ? 'border-primary text-stone-charcoal bg-white'
+                  : 'border-transparent text-stone-400 hover:text-stone-700 hover:bg-stone-50/50'
+              }`}
+            >
+              Estilos de Práctica 🧘
             </button>
           </div>
 
@@ -2310,6 +2569,362 @@ export default function AdminPanel({
                     Haz clic en "Modificar / Ver" en cualquiera de las tarjetas de reserva para gestionar sus detalles e información de contacto aquí.
                   </div>
                 )}
+              </div>
+            </div>
+          )}
+
+          {/* ESTILOS DE PRÁCTICA (DYNAMIC SLIDER) MANAGEMENT TAB */}
+          {adminTab === 'estilos' && (
+            <div className="space-y-6 pb-12">
+              <div className="flex flex-wrap items-center justify-between gap-4 p-5 bg-white border border-stone-borders">
+                <div>
+                  <h3 className="font-serif text-lg text-stone-charcoal font-light">
+                    Estilos de Práctica (Tarjetón Dinámico Slider)
+                  </h3>
+                  <p className="text-xs text-stone-500 font-light mt-0.5">
+                    Gestiona los estilos que se visualizan en el tarjetón dinámico de la web. Puedes agregar nuevos estilos, subir o cambiar fotos, editar títulos y textos, o reordenarlos.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleStartCreateEstilo}
+                  className="flex items-center gap-1.5 px-4 py-2.5 bg-stone-charcoal hover:bg-emerald-700 text-stone-sand text-[10px] font-bold uppercase tracking-wider transition-colors cursor-pointer"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Agregar Nuevo Estilo
+                </button>
+              </div>
+
+              <div className="grid gap-6 lg:grid-cols-12 items-start">
+                {/* LEFT: Estilos list */}
+                <div className="lg:col-span-7 space-y-4">
+                  {estilosList.length === 0 ? (
+                    <div className="p-12 text-center bg-white border border-dashed border-stone-borders">
+                      <ImageIcon className="h-8 w-8 text-stone-300 mx-auto mb-2" />
+                      <p className="text-sm font-serif italic text-stone-400">
+                        Aún no has agregado estilos de práctica.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={handleStartCreateEstilo}
+                        className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 bg-stone-charcoal text-white text-xs uppercase font-bold tracking-wider"
+                      >
+                        <Plus className="h-3.5 w-3.5" /> Crear primer estilo
+                      </button>
+                    </div>
+                  ) : (
+                    estilosList.map((estilo, idx) => {
+                      const isCurrentlySelected = selectedEstilo?.id === estilo.id || (!selectedEstilo && idx === 0);
+                      return (
+                        <div
+                          key={estilo.id || `estilo-${idx}`}
+                          onClick={() => handleStartEditEstilo(estilo)}
+                          className={`p-4.5 bg-white border transition-all flex flex-col sm:flex-row items-start sm:items-center gap-4 cursor-pointer group rounded-xs ${
+                            isCurrentlySelected
+                              ? 'border-stone-charcoal ring-2 ring-stone-charcoal/80 bg-stone-sand/25 shadow-sm'
+                              : 'border-stone-borders hover:border-stone-charcoal hover:bg-stone-50/70 hover:shadow-xs'
+                          }`}
+                          title="Haz clic en este tarjetón para entrar a editar su foto y textos"
+                        >
+                          {/* Thumbnail with quick hover indicator */}
+                          <div className="w-full sm:w-32 h-20 bg-stone-100 border border-stone-borders overflow-hidden shrink-0 relative group-hover:opacity-95 transition-opacity">
+                            <img
+                              src={estilo.image}
+                              alt={estilo.title || `Estilo ${idx + 1}`}
+                              className="w-full h-full object-cover"
+                              referrerPolicy="no-referrer"
+                            />
+                            <span className="absolute bottom-1 left-1 bg-black/75 text-white text-[9px] font-mono px-1">
+                              #{idx + 1}
+                            </span>
+                            <div className="absolute inset-0 bg-stone-charcoal/0 group-hover:bg-stone-charcoal/15 transition-colors flex items-center justify-center pointer-events-none">
+                              <span className="opacity-0 group-hover:opacity-100 transition-opacity bg-stone-charcoal/90 text-white text-[9px] font-bold px-1.5 py-0.5 uppercase tracking-wider flex items-center gap-1 shadow-xs">
+                                <Edit3 className="w-2.5 h-2.5" /> Editar
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Title, badge, and details */}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1 flex-wrap">
+                              {estilo.energy && (
+                                <span className="inline-block text-[9px] font-bold uppercase tracking-wider text-stone-gold bg-stone-sand/60 px-1.5 py-0.5 rounded-xs">
+                                  {estilo.energy}
+                                </span>
+                              )}
+                              <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-xs inline-flex items-center gap-1 transition-colors ${
+                                isCurrentlySelected
+                                  ? 'bg-stone-charcoal text-white'
+                                  : 'bg-stone-150 text-stone-600 group-hover:bg-stone-200'
+                              }`}>
+                                {isCurrentlySelected ? (
+                                  <>
+                                    <CheckCircle className="w-2.5 h-2.5 text-emerald-300" />
+                                    Editando ahora
+                                  </>
+                                ) : (
+                                  <>
+                                    <Edit3 className="w-2.5 h-2.5" />
+                                    Toca para entrar
+                                  </>
+                                )}
+                              </span>
+                            </div>
+
+                            <h4 className="font-serif text-sm text-stone-charcoal font-medium truncate">
+                              {estilo.title || <span className="italic text-stone-400">Sin título</span>}
+                            </h4>
+                            {estilo.description && (
+                              <p className="text-xs text-stone-500 font-light line-clamp-2 mt-0.5 leading-relaxed">
+                                {estilo.description}
+                              </p>
+                            )}
+                            <p className="text-[10px] text-stone-400 font-mono mt-1">
+                              Tarjetón #{idx + 1} de {estilosList.length} • Clic para modificar imagen o texto
+                            </p>
+                          </div>
+
+                          {/* Reorder & Action buttons */}
+                          <div 
+                            className="flex items-center gap-1.5 w-full sm:w-auto justify-end border-t sm:border-t-0 pt-2 sm:pt-0 border-stone-100 shrink-0"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {deleteConfirmEstiloId === estilo.id ? (
+                              <div className="flex items-center gap-1 bg-red-50 border border-red-200 p-1">
+                                <span className="text-[9px] text-red-650 font-bold uppercase tracking-wider px-1">
+                                  ¿Eliminar?
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteEstilo(estilo.id || `estilo-${idx}`)}
+                                  className="px-2 py-1 text-[9px] font-bold uppercase tracking-wider text-white bg-[#b92c2c] hover:bg-red-705 transition-colors cursor-pointer"
+                                >
+                                  Sí
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setDeleteConfirmEstiloId(null)}
+                                  className="px-2 py-1 text-[9px] font-bold uppercase tracking-wider text-stone-600 border border-stone-borders bg-white hover:bg-stone-sand transition-colors cursor-pointer"
+                                >
+                                  No
+                                </button>
+                              </div>
+                            ) : (
+                              <>
+                                <button
+                                  type="button"
+                                  disabled={idx === 0}
+                                  onClick={() => handleMoveEstilo(idx, 'up')}
+                                  className="p-1.5 border border-stone-borders text-stone-600 hover:bg-stone-sand disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer"
+                                  title="Mover arriba"
+                                >
+                                  <ArrowUp className="h-3.5 w-3.5" />
+                                </button>
+
+                                <button
+                                  type="button"
+                                  disabled={idx === estilosList.length - 1}
+                                  onClick={() => handleMoveEstilo(idx, 'down')}
+                                  className="p-1.5 border border-stone-borders text-stone-600 hover:bg-stone-sand disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer"
+                                  title="Mover abajo"
+                                >
+                                  <ArrowDown className="h-3.5 w-3.5" />
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleStartEditEstilo(estilo)}
+                                  className={`flex items-center gap-1.5 px-3 py-1.5 border text-[10px] uppercase font-bold tracking-wider cursor-pointer transition-all ${
+                                    isCurrentlySelected
+                                      ? 'bg-stone-charcoal text-white border-stone-charcoal shadow-xs'
+                                      : 'border-stone-borders bg-white hover:bg-stone-charcoal hover:text-white text-stone-charcoal'
+                                  }`}
+                                >
+                                  <Edit3 className="h-3 w-3" />
+                                  {isCurrentlySelected ? 'Editando' : 'Editar'}
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => setDeleteConfirmEstiloId(estilo.id || `estilo-${idx}`)}
+                                  className="p-1.5 border border-red-200 text-red-600 hover:bg-red-50 cursor-pointer"
+                                  title="Eliminar estilo"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+
+                {/* RIGHT: Estilo Editor / Uploader */}
+                <div 
+                  ref={estiloEditorRef} 
+                  className="lg:col-span-5 bg-white border border-stone-borders p-6 space-y-5 rounded-xs shadow-xs"
+                >
+                  {selectedEstilo ? (
+                    <div className="space-y-4">
+                      <div className="flex items-start justify-between border-b border-stone-150 pb-3">
+                        <div>
+                          <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-stone-charcoal block">
+                            {isCreatingEstilo ? 'Agregar Nuevo Estilo' : `Editando: ${selectedEstilo.title || 'Tarjetón'}`}
+                          </span>
+                          <p className="text-[11px] text-stone-500 mt-0.5 font-light">
+                            Modifica la foto y textos del tarjetón. Los cambios se sincronizarán al guardar.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedEstilo(null);
+                            setIsCreatingEstilo(false);
+                          }}
+                          className="p-1.5 text-stone-400 hover:text-stone-700 hover:bg-stone-100 transition-colors"
+                          title="Cerrar editor"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+
+                      {/* Image Preview & Direct Replacement options */}
+                      <div className="space-y-3 bg-stone-50/60 p-4 border border-stone-200">
+                        <label className="block text-[10px] font-bold uppercase tracking-widest text-stone-charcoal">
+                          1. Imagen del Tarjetón *
+                        </label>
+
+                        {/* Image Preview */}
+                        {estiloImageInput ? (
+                          <div className="relative w-full aspect-[16/10] bg-stone-200 border border-stone-borders overflow-hidden shadow-inner">
+                            <img
+                              src={estiloImageInput}
+                              alt="Vista previa del estilo"
+                              className="w-full h-full object-cover"
+                              referrerPolicy="no-referrer"
+                            />
+                            <div className="absolute bottom-2 right-2 bg-stone-charcoal/80 backdrop-blur-xs text-white text-[9px] px-2 py-0.5 uppercase tracking-wider font-mono">
+                              Foto Actual
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="w-full aspect-[16/10] bg-stone-100 border-2 border-dashed border-stone-borders flex flex-col items-center justify-center p-4 text-center">
+                            <ImageIcon className="w-8 h-8 text-stone-300 mb-1" />
+                            <span className="text-xs text-stone-400 italic">No hay imagen seleccionada</span>
+                          </div>
+                        )}
+
+                        {/* Direct Upload button */}
+                        <div className="space-y-2 pt-1">
+                          <label className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-stone-borders hover:border-stone-charcoal hover:bg-stone-sand/40 text-stone-charcoal text-xs font-bold uppercase tracking-wider cursor-pointer transition-all shadow-xs">
+                            <Upload className="w-3.5 h-3.5 text-stone-600" />
+                            <span>{isUploadingEstiloImage ? 'Optimizando foto...' : 'Subir nueva foto desde tu dispositivo'}</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              disabled={isUploadingEstiloImage}
+                              className="hidden"
+                              onChange={handleUploadEstiloImage}
+                            />
+                          </label>
+
+                          {/* Direct URL input */}
+                          <div>
+                            <span className="text-[9px] font-bold uppercase tracking-widest text-stone-500 block mb-1">
+                              O cambiar mediante enlace URL directo:
+                            </span>
+                            <input
+                              type="url"
+                              placeholder="https://images.unsplash.com/..."
+                              value={estiloImageInput}
+                              onChange={(e) => setEstiloImageInput(e.target.value)}
+                              className="w-full rounded-none border border-stone-borders bg-white px-3 py-2 text-xs text-stone-charcoal focus:border-stone-charcoal outline-hidden"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Text inputs: Title, Energy, Description */}
+                      <div className="space-y-3 bg-stone-50/60 p-4 border border-stone-200">
+                        <label className="block text-[10px] font-bold uppercase tracking-widest text-stone-charcoal">
+                          2. Textos del Tarjetón
+                        </label>
+
+                        {/* Title Input */}
+                        <div className="space-y-1">
+                          <label className="text-[9px] font-bold uppercase tracking-widest text-stone-600 block">
+                            Título del Estilo *
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Ej: Yin & Yang Yoga"
+                            value={estiloTitleInput}
+                            onChange={(e) => setEstiloTitleInput(e.target.value)}
+                            className="w-full rounded-none border border-stone-borders bg-white py-2 px-3 text-xs text-stone-charcoal focus:border-stone-charcoal focus:outline-hidden font-medium"
+                          />
+                        </div>
+
+                        {/* Energy / Badge Input */}
+                        <div className="space-y-1">
+                          <label className="text-[9px] font-bold uppercase tracking-widest text-stone-600 block">
+                            Energía / Subtítulo (Opcional)
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Ej: EQUILIBRIO ó DINÁMICO • YANG"
+                            value={estiloEnergyInput}
+                            onChange={(e) => setEstiloEnergyInput(e.target.value)}
+                            className="w-full rounded-none border border-stone-borders bg-white py-2 px-3 text-xs text-stone-charcoal focus:border-stone-charcoal focus:outline-hidden"
+                          />
+                        </div>
+
+                        {/* Description Input */}
+                        <div className="space-y-1">
+                          <label className="text-[9px] font-bold uppercase tracking-widest text-stone-600 block">
+                            Descripción / Detalle del Estilo
+                          </label>
+                          <textarea
+                            rows={4}
+                            placeholder="Detalla las características y sensaciones de la práctica..."
+                            value={estiloDescInput}
+                            onChange={(e) => setEstiloDescInput(e.target.value)}
+                            className="w-full rounded-none border border-stone-borders bg-white py-2 px-3 text-xs text-stone-charcoal focus:border-stone-charcoal focus:outline-hidden resize-none leading-relaxed"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Action buttons */}
+                      <div className="flex gap-2 pt-2">
+                        <button
+                          type="button"
+                          disabled={saveLoading || isUploadingEstiloImage}
+                          onClick={handleSaveEstiloLocally}
+                          className="flex-1 flex items-center justify-center gap-2 rounded-none bg-stone-charcoal hover:bg-emerald-700 text-white font-bold text-[10px] uppercase tracking-wider py-3.5 cursor-pointer transition-colors shadow-sm"
+                        >
+                          <Save className="h-4 w-4" />
+                          {saveLoading ? 'Guardando...' : 'Guardar cambios del tarjetón'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedEstilo(null);
+                            setIsCreatingEstilo(false);
+                          }}
+                          className="px-5 rounded-none border border-stone-borders bg-white hover:bg-stone-sand text-stone-600 font-bold text-[10px] uppercase tracking-wider py-3.5 cursor-pointer transition-colors"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-20 text-stone-400 font-light text-xs font-serif italic border border-dashed border-stone-borders bg-stone-sand/10">
+                      Selecciona un estilo de la lista para editar su foto y texto, o haz clic en "Agregar Nuevo Estilo".
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           )}

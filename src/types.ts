@@ -74,3 +74,11 @@ export interface QuickAccessButton {
   image: string;
   targetSection?: string;
 }
+
+export interface PracticeStyle {
+  id: string;
+  title: string;
+  energy: string;
+  description: string;
+  image: string;
+}

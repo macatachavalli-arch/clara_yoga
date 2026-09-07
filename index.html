@@ -3,8 +3,50 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Clara Yoga</title>
+    <title>Remix: Yoga & Shiatsu Reservas</title>
+    <meta name="description" content="Plataforma de clases de Yoga y masajes Shiatsu japoneses con sistema interactivo de reserva de turnos." />
+    <meta property="og:title" content="Remix: Yoga & Shiatsu Reservas" />
+    <meta property="og:description" content="Plataforma de clases de Yoga y masajes Shiatsu japoneses con sistema interactivo de reserva de turnos." />
     <link rel="icon" type="image/png" href="https://i.imgur.com/TUgezz3.png" />
+    <script>
+      (function() {
+        function isExtensionError(err) {
+          if (!err) return false;
+          var msg = '';
+          var stack = '';
+          if (typeof err === 'string') {
+            msg = err;
+          } else if (typeof err === 'object') {
+            msg = (err.message || err.description || err.name || '') + ' ' + (err.reason || '');
+            stack = err.stack || '';
+          }
+          var lower = (msg + ' ' + stack).toLowerCase();
+          return (
+            lower.indexOf('metamask') !== -1 ||
+            lower.indexOf('ethereum') !== -1 ||
+            lower.indexOf('failed to connect to metamask') !== -1 ||
+            lower.indexOf('chrome-extension://') !== -1 ||
+            lower.indexOf('moz-extension://') !== -1 ||
+            lower.indexOf('safari-extension://') !== -1
+          );
+        }
+
+        window.addEventListener('unhandledrejection', function(event) {
+          if (isExtensionError(event.reason)) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+          }
+        }, true);
+
+        window.addEventListener('error', function(event) {
+          if (isExtensionError(event.error) || isExtensionError(event.message) || isExtensionError(event.filename)) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            return true;
+          }
+        }, true);
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

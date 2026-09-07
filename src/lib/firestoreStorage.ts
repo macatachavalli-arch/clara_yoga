@@ -1,7 +1,7 @@
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
-import { CarouselSlide, Service, BlockedSlot, Booking, QuickAccessButton } from '../types';
-import { SERVICES, DEFAULT_CAROUSEL_SLIDES, DEFAULT_CAROUSEL_SLIDES_2, DEFAULT_QUICK_ACCESS_BUTTONS } from '../data';
+import { CarouselSlide, Service, BlockedSlot, Booking, QuickAccessButton, PracticeStyle } from '../types';
+import { SERVICES, DEFAULT_CAROUSEL_SLIDES, DEFAULT_CAROUSEL_SLIDES_2, DEFAULT_QUICK_ACCESS_BUTTONS, DEFAULT_PRACTICE_STYLES } from '../data';
 
 // Helper to strip undefined values for Firestore setDoc compatibility
 function cleanForFirestore<T>(data: T): T {
@@ -221,6 +221,49 @@ export async function saveQuickButtonsToFirestore(buttons: QuickAccessButton[]):
     return true;
   } catch (err) {
     console.warn('[Firestore] Notice: quickButtons saved locally (Quota/Offline).');
+    return true;
+  }
+}
+
+// Estilos de Práctica (Dynamic Slider)
+export async function getEstilosFromFirestore(): Promise<PracticeStyle[]> {
+  try {
+    const docRef = doc(db, 'appData', 'estilos');
+    const snap = await getDoc(docRef);
+    if (snap.exists() && Array.isArray(snap.data()?.estilos) && snap.data().estilos.length > 0) {
+      const data = snap.data().estilos;
+      try {
+        localStorage.setItem('clara_cached_estilos', JSON.stringify(data));
+      } catch (e) {}
+      return data;
+    }
+  } catch (err) {
+    console.warn('[Firestore] Notice: estilos falling back to cache/defaults:', err);
+  }
+
+  const cached = localStorage.getItem('clara_cached_estilos');
+  if (cached) {
+    try {
+      const parsed = JSON.parse(cached);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    } catch (e) {}
+  }
+
+  return DEFAULT_PRACTICE_STYLES;
+}
+
+export async function saveEstilosToFirestore(estilos: PracticeStyle[]): Promise<boolean> {
+  try {
+    localStorage.setItem('clara_cached_estilos', JSON.stringify(estilos));
+  } catch (e) { console.warn(e); }
+
+  try {
+    const docRef = doc(db, 'appData', 'estilos');
+    const payload = cleanForFirestore({ estilos, updatedAt: new Date().toISOString() });
+    await setDoc(docRef, payload);
+    return true;
+  } catch (err) {
+    console.warn('[Firestore] Notice: estilos saved locally (Quota/Offline).');
     return true;
   }
 }

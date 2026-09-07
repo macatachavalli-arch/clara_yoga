@@ -19,13 +19,14 @@ import TherapeuticTeam from './components/TherapeuticTeam';
 import ContactSection from './components/ContactSection';
 import ZenBackgroundAudio from './components/ZenBackgroundAudio';
 import FloatingNav from './components/FloatingNav';
-import { SERVICES, DEFAULT_CAROUSEL_SLIDES } from './data';
-import { Booking, Service, BlockedSlot, CarouselSlide } from './types';
+import { SERVICES, DEFAULT_CAROUSEL_SLIDES, DEFAULT_PRACTICE_STYLES } from './data';
+import { Booking, Service, BlockedSlot, CarouselSlide, PracticeStyle } from './types';
 import { 
   getServicesFromFirestore, 
   getBlockedSlotsFromFirestore, 
   getBookingsFromFirestore,
-  getCarouselFromFirestore
+  getCarouselFromFirestore,
+  getEstilosFromFirestore
 } from './lib/firestoreStorage';
 
 export default function App() {
@@ -61,9 +62,23 @@ export default function App() {
     return DEFAULT_CAROUSEL_SLIDES;
   });
 
+  const [estilos, setEstilos] = useState<PracticeStyle[]>(() => {
+    try {
+      const cached = localStorage.getItem('clara_cached_estilos');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {
+      console.warn(e);
+    }
+    return DEFAULT_PRACTICE_STYLES;
+  });
+
   const [blockedSlots, setBlockedSlots] = useState<BlockedSlot[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [isAdminActive, setIsAdminActive] = useState<boolean>(false);
+  const [adminInitialTab, setAdminInitialTab] = useState<'services' | 'carousel' | 'blocks' | 'bookings' | 'estilos'>('services');
 
   // Fetch updated services list, blocked slots and bookings on startup/refresh
   useEffect(() => {
@@ -153,8 +168,32 @@ export default function App() {
       setBookings(fsBookings);
     };
 
+    const fetchEstilos = async () => {
+      try {
+        const resp = await fetch('/api/estilos', { cache: 'no-store' });
+        if (resp.ok) {
+          const data = await resp.json();
+          if (data.success && Array.isArray(data.estilos) && data.estilos.length > 0) {
+            setEstilos(data.estilos);
+            try {
+              localStorage.setItem('clara_cached_estilos', JSON.stringify(data.estilos));
+            } catch (e) { console.warn(e); }
+            return;
+          }
+        }
+      } catch (err) {
+        console.warn('Backend API unavailable. Fetching estilos from Firestore.', err);
+      }
+
+      const fsEstilos = await getEstilosFromFirestore();
+      if (fsEstilos && fsEstilos.length > 0) {
+        setEstilos(fsEstilos);
+      }
+    };
+
     fetchServices();
     fetchCarousel();
+    fetchEstilos();
     fetchBlockedSlots();
     fetchBookings();
   }, [refreshFlag]);
@@ -281,6 +320,7 @@ export default function App() {
       
       {isAdminActive ? (
         <AdminPanel 
+          initialTab={adminInitialTab}
           services={services}
           onServicesUpdated={(updated) => setServices(updated)}
           blockedSlots={blockedSlots}
@@ -290,6 +330,8 @@ export default function App() {
           onBookingsUpdated={(updated) => setBookings(updated)}
           carouselSlides={yogaSlides}
           onCarouselUpdated={(updated) => setYogaSlides(updated)}
+          estilos={estilos}
+          onEstilosUpdated={(updated) => setEstilos(updated)}
         />
       ) : (
         <>
@@ -320,8 +362,14 @@ export default function App() {
                   {/* Screen 2: Yoga (Introducción y Método con Carrusel de 3 fotos) */}
                   <YogaExplainerSection slides={yogaSlides} />
 
-                  {/* Screen 3: Estilos de Práctica */}
-                  <EstilosPracticaSection />
+                  {/* Screen 3: Estilos de Práctica (Dynamic Slider) */}
+                  <EstilosPracticaSection 
+                    estilos={estilos} 
+                    onAdminClick={() => {
+                      setAdminInitialTab('estilos');
+                      setIsAdminActive(true);
+                    }}
+                  />
 
                   {/* Screen 4: Horarios & Abonos */}
                   <HorariosSection services={services} />
@@ -333,7 +381,10 @@ export default function App() {
                   <TherapeuticTeam />
 
                   {/* Screen 7: Contacto */}
-                  <ContactSection onAdminClick={() => setIsAdminActive(true)} />
+                  <ContactSection onAdminClick={() => {
+                    setAdminInitialTab('services');
+                    setIsAdminActive(true);
+                  }} />
                 </motion.div>
               )}
 

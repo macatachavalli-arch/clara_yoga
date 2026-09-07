@@ -46,6 +46,14 @@
         "paymentStatus": { "type": "string" },
         "createdAt": { "type": "string" }
       }
+    },
+    "estilos": {
+      "title": "Practice Styles",
+      "description": "Dynamic single-card slider styles with images, energy badges, titles, and descriptions",
+      "fields": {
+        "estilos": { "type": "array", "description": "List of practice style objects" },
+        "updatedAt": { "type": "string", "description": "ISO timestamp" }
+      }
     }
   }
 }

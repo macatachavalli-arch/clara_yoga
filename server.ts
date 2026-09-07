@@ -4,7 +4,7 @@ import path from 'path';
 import fs from 'fs';
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFirestore, doc, getDoc, setDoc } from 'firebase/firestore';
-import { SERVICES, DEFAULT_CAROUSEL_SLIDES, DEFAULT_CAROUSEL_SLIDES_2, DEFAULT_QUICK_ACCESS_BUTTONS } from './src/data';
+import { SERVICES, DEFAULT_CAROUSEL_SLIDES, DEFAULT_CAROUSEL_SLIDES_2, DEFAULT_QUICK_ACCESS_BUTTONS, DEFAULT_PRACTICE_STYLES } from './src/data';
 
 async function startServer() {
   const app = express();
@@ -35,11 +35,51 @@ async function startServer() {
   const CAROUSEL_FILE = path.join(process.cwd(), 'carousel.json');
   const CAROUSEL2_FILE = path.join(process.cwd(), 'carousel2.json');
   const QUICK_BUTTONS_FILE = path.join(process.cwd(), 'quick_buttons.json');
+  const ESTILOS_FILE = path.join(process.cwd(), 'estilos.json');
   const UPLOADS_DIR = path.join(process.cwd(), 'public', 'uploads');
 
   if (!fs.existsSync(UPLOADS_DIR)) {
     fs.mkdirSync(UPLOADS_DIR, { recursive: true });
   }
+
+  // Helper to extract base64 images for practice styles
+  const processAndSaveEstilosImages = (estilos: any[]): any[] => {
+    if (!Array.isArray(estilos)) return [];
+    if (!fs.existsSync(UPLOADS_DIR)) {
+      fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+    }
+
+    return estilos.map((item, idx) => {
+      let img = item.image;
+      const itemId = item.id || `estilo-${Date.now()}-${idx}`;
+
+      if (img && typeof img === 'string' && img.startsWith('data:image/')) {
+        try {
+          const matches = img.match(/^data:image\/([a-zA-Z0-9+]+);base64,(.+)$/);
+          if (matches && matches.length === 3) {
+            const rawExt = matches[1].toLowerCase();
+            const ext = rawExt === 'jpeg' ? 'jpg' : rawExt === 'svg+xml' ? 'svg' : rawExt;
+            const filename = `estilo-${itemId}.${ext}`;
+            const filePath = path.join(UPLOADS_DIR, filename);
+            fs.writeFileSync(filePath, Buffer.from(matches[2], 'base64'));
+            img = `/uploads/${filename}`;
+            console.log(`[Storage] Saved uploaded estilo image to ${img}`);
+          }
+        } catch (err) {
+          console.error('Error saving estilo base64 image to disk:', err);
+        }
+      }
+
+      return {
+        ...item,
+        id: itemId,
+        title: item.title || '',
+        energy: item.energy || '',
+        description: item.description || '',
+        image: img || ''
+      };
+    });
+  };
 
   // Helper to extract base64 images to static files in public/uploads
   const processAndSaveSlideImages = (slides: any[]): any[] => {
@@ -212,6 +252,30 @@ async function startServer() {
     }
   };
 
+  const getPersistedEstilos = (): any[] => {
+    try {
+      if (fs.existsSync(ESTILOS_FILE)) {
+        const fileContent = fs.readFileSync(ESTILOS_FILE, 'utf8');
+        const parsed = JSON.parse(fileContent);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+      return DEFAULT_PRACTICE_STYLES;
+    } catch (err) {
+      console.error('Error reading estilos file. Falling back to defaults.', err);
+      return DEFAULT_PRACTICE_STYLES;
+    }
+  };
+
+  const savePersistedEstilos = (estilosList: any[]): boolean => {
+    try {
+      fs.writeFileSync(ESTILOS_FILE, JSON.stringify(estilosList, null, 2), 'utf8');
+      return true;
+    } catch (err) {
+      console.error('Error writing estilos file.', err);
+      return false;
+    }
+  };
+
   // --- Cloud Firestore Persistence Layer ---
   const getPersistedServicesAsync = async (): Promise<any[]> => {
     let firestoreError = false;
@@ -330,6 +394,45 @@ async function startServer() {
       }
     }
     return true;
+  };
+
+  const getPersistedEstilosAsync = async (): Promise<any[]> => {
+    if (db) {
+      try {
+        const docRef = doc(db, 'appData', 'estilos');
+        const snap = await getDoc(docRef);
+        if (snap.exists() && snap.data()?.estilos && Array.isArray(snap.data().estilos) && snap.data().estilos.length > 0) {
+          return snap.data().estilos;
+        }
+        if (!snap.exists()) {
+          const localData = getPersistedEstilos();
+          if (localData.length > 0) {
+            try {
+              await setDoc(docRef, { estilos: localData, updatedAt: new Date().toISOString() });
+            } catch (e) { /* ignore seed error */ }
+          }
+          return localData;
+        }
+      } catch (err: any) {
+        console.warn('[Firestore] Notice: getEstilos falling back to disk persistence:', err);
+      }
+    }
+    return getPersistedEstilos();
+  };
+
+  const savePersistedEstilosAsync = async (estilosList: any[]): Promise<{ success: boolean; estilos: any[] }> => {
+    const processedEstilos = processAndSaveEstilosImages(estilosList);
+    savePersistedEstilos(processedEstilos);
+    if (db) {
+      try {
+        const docRef = doc(db, 'appData', 'estilos');
+        await setDoc(docRef, { estilos: processedEstilos, updatedAt: new Date().toISOString() });
+        console.log('[Firestore] Successfully synced estilos to Cloud Firestore!');
+      } catch (err: any) {
+        console.warn('[Firestore] Notice: saveEstilos saved to local disk:', err);
+      }
+    }
+    return { success: true, estilos: processedEstilos };
   };
 
   const getPersistedBlockedSlotsAsync = async (): Promise<any[]> => {
@@ -614,6 +717,40 @@ async function startServer() {
       res.json({ success: true, buttons: cleanedButtons });
     } else {
       res.status(500).json({ success: false, message: 'Error al guardar los botones de acceso rápido.' });
+    }
+  });
+
+  // API Route: Fetch practice styles (estilos de práctica)
+  app.get('/api/estilos', async (req, res) => {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    const estilos = await getPersistedEstilosAsync();
+    res.json({ success: true, estilos });
+  });
+
+  // API Route: Update practice styles (estilos de práctica)
+  app.post('/api/estilos', async (req, res) => {
+    if (!isValidAdminToken(req)) {
+      return res.status(403).json({ success: false, message: 'No autorizado. Sesión inválida o expirada.' });
+    }
+
+    const { estilos } = req.body;
+    if (!Array.isArray(estilos)) {
+      return res.status(400).json({ success: false, message: 'Estructura de datos inválida para estilos.' });
+    }
+
+    const cleanedEstilos = estilos.map(e => ({
+      id: e.id || `estilo-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      title: String(e.title || '').trim(),
+      energy: String(e.energy || '').trim(),
+      description: String(e.description || '').trim(),
+      image: String(e.image || '').trim()
+    }));
+
+    const result = await savePersistedEstilosAsync(cleanedEstilos);
+    if (result.success) {
+      res.json({ success: true, estilos: result.estilos });
+    } else {
+      res.status(500).json({ success: false, message: 'Error al guardar estilos de práctica.' });
     }
   });
 

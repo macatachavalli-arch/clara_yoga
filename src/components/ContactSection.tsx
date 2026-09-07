@@ -216,11 +216,11 @@ export default function ContactSection({ onAdminClick }: ContactSectionProps) {
             {onAdminClick && (
               <button 
                 onClick={onAdminClick}
-                title="Panel de gestión"
-                aria-label="Panel de gestión"
-                className="hidden md:inline-flex text-stone-500 hover:text-stone-300 transition-colors cursor-pointer p-1"
+                title="Panel de administración"
+                aria-label="Panel de administración"
+                className="inline-flex items-center justify-center text-stone-500 hover:text-stone-300 transition-colors cursor-pointer p-1.5"
               >
-                <Lock className="h-3.5 w-3.5" />
+                <Lock className="h-4 w-4" />
               </button>
             )}
             <a 
