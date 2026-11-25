@@ -83,7 +83,7 @@ export default function ZenBackgroundAudio() {
     <button
       onClick={toggleSound}
       title={isPlaying ? "Silenciar sonido de la naturaleza" : "Escuchar ambiente de la naturaleza (arroyo, pájaros y cristal)"}
-      className="fixed bottom-4 right-4 z-40 flex items-center justify-center h-10 w-10 rounded-full bg-stone-900/80 backdrop-blur-md border border-[#dcdcdc]/40 hover:border-[#dcdcdc] hover:bg-stone-900 transition-all shadow-lg cursor-pointer"
+      className="fixed bottom-[calc(72px+env(safe-area-inset-bottom,0px))] md:bottom-4 right-4 z-[75] flex items-center justify-center h-10 w-10 rounded-full bg-stone-900/80 backdrop-blur-md border border-[#dcdcdc]/40 hover:border-[#dcdcdc] hover:bg-stone-900 transition-all shadow-lg cursor-pointer"
       style={{ color: '#dcdcdc' }}
       aria-label="Sonido sereno de naturaleza con agua, pájaros y cristal"
     >
