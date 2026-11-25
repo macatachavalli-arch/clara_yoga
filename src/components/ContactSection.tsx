@@ -61,7 +61,7 @@ export default function ContactSection({ onAdminClick }: ContactSectionProps) {
   return (
     <section 
       id="contacto" 
-      className="pt-8 sm:pt-10 md:pt-12 pb-3 bg-[#232323] text-stone-200 scroll-mt-[48px] md:scroll-mt-[52px] min-h-[calc(100dvh-48px)] md:min-h-[calc(100dvh-52px)] flex flex-col justify-between relative"
+      className="pt-8 sm:pt-10 md:pt-12 pb-3 bg-[#000000] text-stone-200 scroll-mt-[48px] md:scroll-mt-[52px] min-h-[calc(100dvh-48px)] md:min-h-[calc(100dvh-52px)] flex flex-col justify-between relative"
     >
       <div id="contact-section" className="sr-only" />
       <div className="mx-auto max-w-3xl px-6 sm:px-8 w-full my-auto">

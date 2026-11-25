@@ -5,6 +5,7 @@
 
 import { useState, useEffect, type SVGProps } from 'react';
 import { Clock, User, Mail } from 'lucide-react';
+import { SectionVisibility } from '../types';
 
 export function LotusIcon({ className = "h-4 w-4", ...props }: SVGProps<SVGSVGElement>) {
   return (
@@ -88,14 +89,14 @@ interface FloatingNavProps {
   onNavigateHomeAndScroll?: (sectionId: string) => void;
   activeTab: 'home' | 'book' | 'my-bookings';
   setActiveTab: (tab: 'home' | 'book' | 'my-bookings') => void;
+  sectionVisibility?: SectionVisibility;
 }
 
 export const SECTIONS = [
   { id: 'yoga', legacyId: 'yoga-explainer', label: 'Yoga', shortLabel: 'Yoga', icon: LotusIcon },
-  { id: 'estilos', legacyId: 'estilos-practica', label: 'Estilos', shortLabel: 'Estilos', icon: YogaWarriorIcon },
-  { id: 'horarios', legacyId: 'horarios-section', label: 'Horarios', shortLabel: 'Horarios', icon: Clock },
+  { id: 'horarios', legacyId: 'horarios-section', label: 'Clases', shortLabel: 'Clases', icon: Clock },
   { id: 'terapias', legacyId: 'services-section', label: 'Terapias', shortLabel: 'Terapias', icon: SimpleSpiralIcon },
-  { id: 'bio', legacyId: 'therapeutic-team-section', label: 'Bío', shortLabel: 'Bío', icon: User },
+  { id: 'bio', legacyId: 'therapeutic-team-section', label: 'Sobre mí', shortLabel: 'Sobre mí', icon: User },
   { id: 'contacto', legacyId: 'contact-section', label: 'Contacto', shortLabel: 'Contacto', icon: Mail },
 ];
 
@@ -112,9 +113,14 @@ export const updateUrlAnchor = (cleanHash: string) => {
   }
 };
 
-export default function FloatingNav({ onNavigateHomeAndScroll, activeTab, setActiveTab }: FloatingNavProps) {
+export default function FloatingNav({ onNavigateHomeAndScroll, activeTab, setActiveTab, sectionVisibility }: FloatingNavProps) {
   const [activeSection, setActiveSection] = useState<string>('');
   const [isScrolledPastHero, setIsScrolledPastHero] = useState<boolean>(false);
+
+  const visibleSections = SECTIONS.filter(sec => {
+    if (!sectionVisibility) return true;
+    return sectionVisibility[sec.id as keyof SectionVisibility] !== false;
+  });
 
   // Track scroll position to:
   // 1. Highlight currently active section
@@ -210,11 +216,11 @@ export default function FloatingNav({ onNavigateHomeAndScroll, activeTab, setAct
       */}
       <header 
         id="desktop-floating-nav"
-        className="hidden md:block sticky top-0 z-50 w-full bg-[#232323] border-b border-white/10 shadow-sm"
+        className="hidden md:block sticky top-0 z-50 w-full bg-[#000000] border-b border-white/10 shadow-sm"
       >
         <nav
           aria-label="Botonera principal de navegación"
-          className="w-full max-w-7xl mx-auto flex items-center justify-center gap-2 sm:gap-4 px-4 py-2 sm:py-2.5 rounded-none"
+          className="w-full flex items-center justify-center gap-2 sm:gap-4 px-4 py-2 sm:py-2.5 rounded-none bg-[#000000]"
         >
           {/* ✶ Símbolo para ir al inicio */}
           <button
@@ -232,7 +238,7 @@ export default function FloatingNav({ onNavigateHomeAndScroll, activeTab, setAct
           <div className="w-[1px] h-4 bg-white/20 my-auto" />
 
           {/* Secciones */}
-          {SECTIONS.map((sec) => {
+          {visibleSections.map((sec) => {
             const isCurrent = activeTab === 'home' && activeSection === sec.id;
             return (
               <button
@@ -289,7 +295,7 @@ export default function FloatingNav({ onNavigateHomeAndScroll, activeTab, setAct
             </button>
 
             {/* Secciones con sólo iconos alusivos */}
-            {SECTIONS.map((sec) => {
+            {visibleSections.map((sec) => {
               const Icon = sec.icon;
               const isCurrent = activeTab === 'home' && activeSection === sec.id;
               return (

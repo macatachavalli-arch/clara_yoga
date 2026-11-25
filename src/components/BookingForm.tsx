@@ -458,7 +458,7 @@ export default function BookingForm({
           </div>
 
           <div className="grid gap-4 sm:gap-6 md:grid-cols-2">
-            {services.map((s) => (
+            {services.filter((s) => s.visible !== false).map((s) => (
               <div
                 key={s.id}
                 onClick={() => handleServiceSelect(s)}

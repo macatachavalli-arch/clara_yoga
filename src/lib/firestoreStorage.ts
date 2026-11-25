@@ -1,6 +1,6 @@
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
-import { CarouselSlide, Service, BlockedSlot, Booking, QuickAccessButton, PracticeStyle } from '../types';
+import { CarouselSlide, Service, BlockedSlot, Booking, QuickAccessButton, PracticeStyle, SectionVisibility, DEFAULT_SECTION_VISIBILITY } from '../types';
 import { SERVICES, DEFAULT_CAROUSEL_SLIDES, DEFAULT_CAROUSEL_SLIDES_2, DEFAULT_QUICK_ACCESS_BUTTONS, DEFAULT_PRACTICE_STYLES } from '../data';
 
 // Helper to strip undefined values for Firestore setDoc compatibility
@@ -264,6 +264,68 @@ export async function saveEstilosToFirestore(estilos: PracticeStyle[]): Promise<
     return true;
   } catch (err) {
     console.warn('[Firestore] Notice: estilos saved locally (Quota/Offline).');
+    return true;
+  }
+}
+
+// Section Visibility (Gestión de secciones visibles / ocultas)
+export async function getSectionVisibilityFromFirestore(): Promise<SectionVisibility> {
+  try {
+    const docRef = doc(db, 'appData', 'sectionVisibility');
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      const data = snap.data();
+      if (data && typeof data === 'object') {
+        const result: SectionVisibility = {
+          yoga: data.yoga !== false,
+          horarios: data.horarios !== false,
+          terapias: data.terapias !== false,
+          bio: data.bio !== false,
+          contacto: data.contacto !== false,
+          pauseNotice: data.pauseNotice || DEFAULT_SECTION_VISIBILITY.pauseNotice,
+        };
+        try {
+          localStorage.setItem('clara_cached_section_visibility', JSON.stringify(result));
+        } catch (e) {}
+        return result;
+      }
+    }
+  } catch (err) {
+    console.warn('[Firestore] Notice: sectionVisibility falling back to cache/defaults:', err);
+  }
+
+  const cached = localStorage.getItem('clara_cached_section_visibility');
+  if (cached) {
+    try {
+      const parsed = JSON.parse(cached);
+      if (parsed && typeof parsed === 'object') {
+        return {
+          yoga: parsed.yoga !== false,
+          horarios: parsed.horarios !== false,
+          terapias: parsed.terapias !== false,
+          bio: parsed.bio !== false,
+          contacto: parsed.contacto !== false,
+          pauseNotice: parsed.pauseNotice || DEFAULT_SECTION_VISIBILITY.pauseNotice,
+        };
+      }
+    } catch (e) {}
+  }
+
+  return DEFAULT_SECTION_VISIBILITY;
+}
+
+export async function saveSectionVisibilityToFirestore(visibility: SectionVisibility): Promise<boolean> {
+  try {
+    localStorage.setItem('clara_cached_section_visibility', JSON.stringify(visibility));
+  } catch (e) { console.warn(e); }
+
+  try {
+    const docRef = doc(db, 'appData', 'sectionVisibility');
+    const payload = cleanForFirestore({ ...visibility, updatedAt: new Date().toISOString() });
+    await setDoc(docRef, payload);
+    return true;
+  } catch (err) {
+    console.warn('[Firestore] Notice: sectionVisibility saved locally (Quota/Offline).');
     return true;
   }
 }

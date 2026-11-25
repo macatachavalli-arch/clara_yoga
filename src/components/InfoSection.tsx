@@ -238,12 +238,12 @@ export default function InfoSection({ services: propServices }: InfoSectionProps
       <div id="horarios-section" className="mx-auto max-w-7xl px-6 sm:px-8 py-16">
         <div className="text-center mb-10">
           <h3 className="font-serif text-3xl font-light text-stone-charcoal sm:text-4xl italic">
-            Horarios
+            Clases
           </h3>
         </div>
 
         <div className="grid gap-8 grid-cols-1 md:grid-cols-2 lg:grid-cols-2 max-w-4xl mx-auto">
-          {activeServices.filter(s => s.category === 'yoga' || s.name.toLowerCase().includes('yoga')).map((service) => {
+          {activeServices.filter(s => (s.category === 'yoga' || s.name.toLowerCase().includes('yoga')) && s.visible !== false).map((service) => {
             const hasP4 = Boolean(service.priceYoga4 && service.priceYoga4 > 0);
             const hasP8 = Boolean((service.priceYoga8 && service.priceYoga8 > 0) || (service.priceYoga8to12 && service.priceYoga8to12 > 0));
             const hasPLibre = Boolean((service.priceYogaPaseLibre && service.priceYogaPaseLibre > 0) || (service.priceYoga12 && service.priceYoga12 > 0));

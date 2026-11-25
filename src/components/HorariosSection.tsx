@@ -13,6 +13,9 @@ interface HorariosSectionProps {
 
 export default function HorariosSection({ services: propServices }: HorariosSectionProps = {}) {
   const activeServices = propServices && propServices.length > 0 ? propServices : SERVICES;
+  const visibleYogaServices = activeServices.filter(
+    (s) => (s.category === 'yoga' || s.name.toLowerCase().includes('yoga')) && s.visible !== false
+  );
 
   return (
     <section 
@@ -20,6 +23,7 @@ export default function HorariosSection({ services: propServices }: HorariosSect
       className="relative w-full bg-stone-sand scroll-mt-[48px] md:scroll-mt-[52px] min-h-[calc(100dvh-48px)] md:min-h-[calc(100dvh-52px)] flex flex-col justify-center py-10 sm:py-12 md:py-14 overflow-hidden"
     >
       <div id="horarios-section" className="sr-only" />
+      <div id="clases" className="sr-only" />
       {/* Background Image (100% tonalidad original sin atenuar) */}
       <div className="absolute inset-0 pointer-events-none z-0">
         <img
@@ -31,14 +35,23 @@ export default function HorariosSection({ services: propServices }: HorariosSect
       </div>
 
       <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 md:px-8 w-full my-auto">
-        <div className="text-center mb-4 sm:mb-6">
-          <h3 className="font-serif text-3xl sm:text-4xl lg:text-5xl font-light text-stone-charcoal tracking-tight">
-            Horarios
-          </h3>
-        </div>
-
-        <div className="grid gap-5 sm:gap-6 grid-cols-1 md:grid-cols-2 max-w-4xl mx-auto items-stretch">
-          {activeServices.filter(s => s.category === 'yoga' || s.name.toLowerCase().includes('yoga')).map((service) => {
+        {visibleYogaServices.length === 0 ? (
+          <div className="max-w-md mx-auto text-center p-8 bg-white/90 backdrop-blur-xs rounded-xl border border-stone-200 shadow-xs">
+            <p className="font-serif italic text-stone-600 text-sm">
+              Actualmente no hay horarios de yoga publicados. Consulta directamente por WhatsApp para coordinar clases personalizadas.
+            </p>
+            <a
+              href={`https://wa.me/5492215232417?text=${encodeURIComponent('¡Hola Clara! Quisiera consultar por disponibilidad de horarios para clases de Yoga.')}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-block mt-4 px-6 py-2.5 text-[10px] font-bold uppercase tracking-[0.18em] transition-all bg-stone-charcoal text-stone-sand hover:bg-primary hover:text-white"
+            >
+              Consultar por WhatsApp
+            </a>
+          </div>
+        ) : (
+          <div className={`grid gap-5 sm:gap-6 ${visibleYogaServices.length === 1 ? 'grid-cols-1 max-w-md' : 'grid-cols-1 md:grid-cols-2 max-w-4xl'} mx-auto items-stretch`}>
+            {visibleYogaServices.map((service) => {
             const hasP4 = Boolean(service.priceYoga4 && service.priceYoga4 > 0);
             const hasP8 = Boolean((service.priceYoga8 && service.priceYoga8 > 0) || (service.priceYoga8to12 && service.priceYoga8to12 > 0));
             const hasPLibre = Boolean((service.priceYogaPaseLibre && service.priceYogaPaseLibre > 0) || (service.priceYoga12 && service.priceYoga12 > 0));
@@ -136,7 +149,7 @@ export default function HorariosSection({ services: propServices }: HorariosSect
                       href={`https://wa.me/5492215232417?text=${encodeURIComponent(`¡Hola Clara! Quisiera consultar por las clases de Yoga: ${service.name}`)}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="block w-full py-2.5 sm:py-3 text-center text-[10px] font-bold uppercase tracking-[0.18em] transition-all duration-300 cursor-pointer bg-stone-charcoal text-stone-sand hover:bg-primary hover:text-white"
+                      className="block w-full py-2.5 sm:py-3 text-center text-[10px] font-bold uppercase tracking-[0.18em] transition-all duration-300 cursor-pointer bg-[#867768] text-white hover:bg-[#3c3129]"
                     >
                       Reservar mi lugar
                     </a>
@@ -146,6 +159,7 @@ export default function HorariosSection({ services: propServices }: HorariosSect
             );
           })}
         </div>
+        )}
       </div>
     </section>
   );

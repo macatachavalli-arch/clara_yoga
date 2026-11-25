@@ -1,0 +1,12 @@
+{
+  "yoga": true,
+  "horarios": true,
+  "terapias": true,
+  "bio": true,
+  "contacto": true,
+  "pauseNotice": {
+    "enabled": false,
+    "title": "Pausa temporal en actividades",
+    "message": "En este momento estamos en una pausa. Para novedades o consultas directas, puedes escribirnos por WhatsApp."
+  }
+}

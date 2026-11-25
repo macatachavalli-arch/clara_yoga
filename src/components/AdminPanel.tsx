@@ -8,7 +8,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   Lock, KeyRound, ShieldCheck, PlusCircle, Trash2, Edit3, 
   Save, Undo2, AlertCircle, CheckCircle, Sparkles, X, ChevronRight, FileText, Plus, Calendar, Clock,
-  User, Phone, Upload, Image as ImageIcon, ArrowUp, ArrowDown
+  User, Phone, Upload, Image as ImageIcon, ArrowUp, ArrowDown, Eye, EyeOff
 } from 'lucide-react';
 import { Service, BlockedSlot, Booking, CarouselSlide, PracticeStyle } from '../types';
 import { DEFAULT_CAROUSEL_SLIDES, DEFAULT_PRACTICE_STYLES } from '../data';
@@ -19,11 +19,14 @@ import {
   saveCarouselToFirestore,
   getCarouselFromFirestore,
   saveEstilosToFirestore,
-  getEstilosFromFirestore
+  getEstilosFromFirestore,
+  saveSectionVisibilityToFirestore,
+  getSectionVisibilityFromFirestore
 } from '../lib/firestoreStorage';
+import { SectionVisibility, DEFAULT_SECTION_VISIBILITY } from '../types';
 
 interface AdminPanelProps {
-  initialTab?: 'services' | 'carousel' | 'blocks' | 'bookings' | 'estilos';
+  initialTab?: 'services' | 'carousel' | 'blocks' | 'bookings' | 'estilos' | 'sections';
   services: Service[];
   onServicesUpdated: (updatedServices: Service[]) => void;
   blockedSlots: BlockedSlot[];
@@ -35,6 +38,8 @@ interface AdminPanelProps {
   onCarouselUpdated?: (updatedSlides: CarouselSlide[]) => void;
   estilos?: PracticeStyle[];
   onEstilosUpdated?: (updatedEstilos: PracticeStyle[]) => void;
+  sectionVisibility?: SectionVisibility;
+  onSectionVisibilityUpdated?: (updated: SectionVisibility) => void;
 }
 
 // Pre-defined templates for creating new service cards
@@ -145,6 +150,8 @@ export default function AdminPanel({
   onCarouselUpdated,
   estilos,
   onEstilosUpdated,
+  sectionVisibility,
+  onSectionVisibilityUpdated,
   initialTab
 }: AdminPanelProps) {
   // Authentication states
@@ -154,14 +161,34 @@ export default function AdminPanel({
   const [loginError, setLoginError] = useState<string>('');
   const [isLoginLoading, setIsLoginLoading] = useState<boolean>(false);
 
-  // Toggle active administration tab: 'services' | 'carousel' | 'blocks' | 'bookings' | 'estilos'
-  const [adminTab, setAdminTab] = useState<'services' | 'carousel' | 'blocks' | 'bookings' | 'estilos'>(initialTab || 'services');
+  // Toggle active administration tab: 'services' | 'carousel' | 'blocks' | 'bookings' | 'estilos' | 'sections'
+  const [adminTab, setAdminTab] = useState<'services' | 'carousel' | 'blocks' | 'bookings' | 'estilos' | 'sections'>(initialTab || 'services');
 
   useEffect(() => {
     if (initialTab) {
       setAdminTab(initialTab);
     }
   }, [initialTab]);
+
+  // Section Visibility (Gestión de pausa y ocultación de secciones)
+  const [sectionsConfig, setSectionsConfig] = useState<SectionVisibility>(() => {
+    if (sectionVisibility) return sectionVisibility;
+    try {
+      const cached = localStorage.getItem('clara_cached_section_visibility');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed && typeof parsed === 'object') return parsed;
+      }
+    } catch (e) {}
+    return DEFAULT_SECTION_VISIBILITY;
+  });
+  const [saveSectionsLoading, setSaveSectionsLoading] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (sectionVisibility) {
+      setSectionsConfig(sectionVisibility);
+    }
+  }, [sectionVisibility]);
 
   // Estilos de Práctica (Slider Dinámico) States
   const [estilosList, setEstilosList] = useState<PracticeStyle[]>(() => {
@@ -181,6 +208,7 @@ export default function AdminPanel({
   const [estiloEnergyInput, setEstiloEnergyInput] = useState<string>('');
   const [estiloDescInput, setEstiloDescInput] = useState<string>('');
   const [estiloImageInput, setEstiloImageInput] = useState<string>('');
+  const [estiloVisibleInput, setEstiloVisibleInput] = useState<boolean>(true);
   const [isUploadingEstiloImage, setIsUploadingEstiloImage] = useState<boolean>(false);
   const [deleteConfirmEstiloId, setDeleteConfirmEstiloId] = useState<string | null>(null);
   const estiloEditorRef = useRef<HTMLDivElement>(null);
@@ -248,6 +276,8 @@ export default function AdminPanel({
   const [editDescription, setEditDescription] = useState<string>('');
   const [editCategory, setEditCategory] = useState<'yoga' | 'shiatsu' | 'combo' | 'reiki'>('yoga');
   const [editDuration, setEditDuration] = useState<number>(60);
+  const [editDurationOptions, setEditDurationOptions] = useState<number[]>([]);
+  const [newDurationInput, setNewDurationInput] = useState<string>('');
   const [editPrice, setEditPrice] = useState<number>(0);
   const [editPriceYoga4, setEditPriceYoga4] = useState<number>(30000);
   const [editPriceYoga8, setEditPriceYoga8] = useState<number>(45000);
@@ -260,6 +290,7 @@ export default function AdminPanel({
   const [isUploadingBgImage, setIsUploadingBgImage] = useState<boolean>(false);
   const [editBenefits, setEditBenefits] = useState<string[]>([]);
   const [newBenefitInput, setNewBenefitInput] = useState<string>('');
+  const [editVisible, setEditVisible] = useState<boolean>(true);
 
   // Status message overlays
   const [saveLoading, setSaveLoading] = useState<boolean>(false);
@@ -339,6 +370,8 @@ export default function AdminPanel({
     setEditDescription(service.description);
     setEditCategory(service.category);
     setEditDuration(service.duration);
+    setEditDurationOptions(Array.isArray(service.durationOptions) ? [...service.durationOptions] : []);
+    setNewDurationInput('');
     setEditPrice(service.price || 0);
     setEditPriceYoga4(service.priceYoga4 ?? 30000);
     setEditPriceYoga8(service.priceYoga8 ?? service.priceYoga8to12 ?? 45000);
@@ -350,6 +383,7 @@ export default function AdminPanel({
     setEditBackgroundImage(service.backgroundImage || '');
     setEditBenefits([...service.benefits]);
     setNewBenefitInput('');
+    setEditVisible(service.visible !== false);
     setStatusMessage(null);
   };
 
@@ -367,6 +401,8 @@ export default function AdminPanel({
     setEditDescription(template.description);
     setEditCategory(template.category);
     setEditDuration(template.duration);
+    setEditDurationOptions(Array.isArray((template as any).durationOptions) ? [...(template as any).durationOptions] : []);
+    setNewDurationInput('');
     setEditPrice(template.price);
     setEditPriceYoga4((template as any).priceYoga4 ?? 30000);
     setEditPriceYoga8((template as any).priceYoga8 ?? (template as any).priceYoga8to12 ?? 45000);
@@ -378,6 +414,7 @@ export default function AdminPanel({
     setEditBackgroundImage('');
     setEditBenefits([...template.benefits]);
     setNewBenefitInput('');
+    setEditVisible(true);
     setStatusMessage(null);
   };
 
@@ -391,6 +428,20 @@ export default function AdminPanel({
 
   const handleRemoveBenefit = (indexToRemove: number) => {
     setEditBenefits(editBenefits.filter((_, i) => i !== indexToRemove));
+  };
+
+  const handleAddDurationOption = () => {
+    const parsed = Number(newDurationInput);
+    if (!isNaN(parsed) && parsed > 0 && parsed <= 480) {
+      if (!editDurationOptions.includes(parsed) && parsed !== Number(editDuration)) {
+        setEditDurationOptions([...editDurationOptions, parsed].sort((a, b) => a - b));
+      }
+      setNewDurationInput('');
+    }
+  };
+
+  const handleRemoveDurationOption = (minutesToRemove: number) => {
+    setEditDurationOptions(editDurationOptions.filter((d) => d !== minutesToRemove));
   };
 
   // Save the temporary edited card into state and sync with the database immediately
@@ -408,6 +459,7 @@ export default function AdminPanel({
       description: editDescription.trim(),
       category: editCategory,
       duration: editDuration !== undefined && editDuration !== null ? Number(editDuration) : 0,
+      durationOptions: editDurationOptions.filter((d) => d > 0 && d !== Number(editDuration)),
       price: Number(editPrice) || 0,
       priceYoga4: editCategory === 'yoga' ? (Number(editPriceYoga4) || 0) : undefined,
       priceYoga8: editCategory === 'yoga' ? (Number(editPriceYoga8) || 0) : undefined,
@@ -417,7 +469,8 @@ export default function AdminPanel({
       intensity: editIntensity,
       highlightNote: editHighlightNote.trim() || undefined,
       backgroundImage: editBackgroundImage.trim() || undefined,
-      benefits: editBenefits
+      benefits: editBenefits,
+      visible: editVisible
     };
 
     let updatedList: Service[];
@@ -436,6 +489,23 @@ export default function AdminPanel({
     await handleSyncWithBackend(updatedList);
   };
 
+  // Quick toggle to show or hide a service card from the public website
+  const handleToggleServiceVisibility = async (serviceId: string) => {
+    const targetService = editedServices.find(s => s.id === serviceId);
+    if (!targetService) return;
+    const nextVisible = targetService.visible === false ? true : false;
+    const updatedList = editedServices.map(s => s.id === serviceId ? { ...s, visible: nextVisible } : s);
+    setEditedServices(updatedList);
+    onServicesUpdated(updatedList);
+    await handleSyncWithBackend(updatedList);
+    setStatusMessage({
+      text: nextVisible
+        ? `Tarjeta "${targetService.name}" ahora es VISIBLE en la web.`
+        : `Tarjeta "${targetService.name}" ha sido OCULTADA de la web.`,
+      isError: false
+    });
+  };
+
   // Sync state list with the Express JSON backend (and local backup cache)
   const handleSyncWithBackend = async (listToSync = editedServices) => {
     setSaveLoading(true);
@@ -450,6 +520,7 @@ export default function AdminPanel({
         description: editDescription.trim(),
         category: editCategory,
         duration: editDuration !== undefined && editDuration !== null ? Number(editDuration) : 0,
+        durationOptions: editDurationOptions.filter((d) => d > 0 && d !== Number(editDuration)),
         price: Number(editPrice) || 0,
         priceYoga4: editCategory === 'yoga' ? (Number(editPriceYoga4) || 0) : undefined,
         priceYoga8: editCategory === 'yoga' ? (Number(editPriceYoga8) || 0) : undefined,
@@ -874,6 +945,7 @@ export default function AdminPanel({
     setEstiloEnergyInput('');
     setEstiloDescInput('');
     setEstiloImageInput('');
+    setEstiloVisibleInput(true);
     setStatusMessage(null);
     setTimeout(() => {
       estiloEditorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -887,6 +959,7 @@ export default function AdminPanel({
     setEstiloEnergyInput(estilo.energy || '');
     setEstiloDescInput(estilo.description || '');
     setEstiloImageInput(estilo.image || '');
+    setEstiloVisibleInput(estilo.visible !== false);
     setStatusMessage(null);
     setTimeout(() => {
       estiloEditorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -991,7 +1064,8 @@ export default function AdminPanel({
       title: estiloTitleInput.trim(),
       energy: estiloEnergyInput.trim(),
       description: estiloDescInput.trim(),
-      image: estiloImageInput.trim()
+      image: estiloImageInput.trim(),
+      visible: estiloVisibleInput
     };
 
     let updatedList: PracticeStyle[];
@@ -1009,6 +1083,27 @@ export default function AdminPanel({
     await handleSyncEstilosWithBackend(updatedList);
     setStatusMessage({
       text: `¡Tarjetón "${updatedEstilo.title}" guardado y actualizado con éxito!`,
+      isError: false
+    });
+  };
+
+  // Quick toggle to show or hide a practice style card from the public website
+  const handleToggleEstiloVisibility = async (estiloId: string) => {
+    const targetEstilo = estilosList.find(e => e.id === estiloId);
+    if (!targetEstilo) return;
+    const nextVisible = targetEstilo.visible === false ? true : false;
+    const updatedList = estilosList.map(e => e.id === estiloId ? { ...e, visible: nextVisible } : e);
+    setEstilosList(updatedList);
+    if (selectedEstilo?.id === estiloId) {
+      setSelectedEstilo({ ...selectedEstilo, visible: nextVisible });
+      setEstiloVisibleInput(nextVisible);
+    }
+    if (onEstilosUpdated) onEstilosUpdated(updatedList);
+    await handleSyncEstilosWithBackend(updatedList);
+    setStatusMessage({
+      text: nextVisible
+        ? `Estilo "${targetEstilo.title || 'seleccionado'}" ahora es VISIBLE en la web.`
+        : `Estilo "${targetEstilo.title || 'seleccionado'}" ha sido OCULTADO de la web.`,
       isError: false
     });
   };
@@ -1035,6 +1130,73 @@ export default function AdminPanel({
 
     setEstilosList(updated);
     handleSyncEstilosWithBackend(updated);
+  };
+
+  const handleSaveSectionsConfig = async (configToSave = sectionsConfig) => {
+    setSaveSectionsLoading(true);
+    setStatusMessage(null);
+
+    try {
+      localStorage.setItem('clara_cached_section_visibility', JSON.stringify(configToSave));
+    } catch (e) {}
+
+    await saveSectionVisibilityToFirestore(configToSave);
+
+    try {
+      await fetch('/api/section-visibility', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ sections: configToSave })
+      });
+    } catch (e) {
+      console.warn('Backend API unavailable. Saved to Firestore and local cache.', e);
+    }
+
+    if (onSectionVisibilityUpdated) {
+      onSectionVisibilityUpdated(configToSave);
+    }
+
+    setSaveSectionsLoading(false);
+    setStatusMessage({
+      text: '¡Configuración de visibilidad guardada y aplicada con éxito en la web!',
+      isError: false
+    });
+  };
+
+  const handleToggleSection = (key: 'yoga' | 'horarios' | 'terapias' | 'bio' | 'contacto') => {
+    const updated: SectionVisibility = {
+      ...sectionsConfig,
+      [key]: !sectionsConfig[key]
+    };
+    setSectionsConfig(updated);
+    handleSaveSectionsConfig(updated);
+  };
+
+  const handleTogglePauseNotice = () => {
+    const currentNotice = sectionsConfig.pauseNotice || DEFAULT_SECTION_VISIBILITY.pauseNotice!;
+    const updated: SectionVisibility = {
+      ...sectionsConfig,
+      pauseNotice: {
+        ...currentNotice,
+        enabled: !currentNotice.enabled
+      }
+    };
+    setSectionsConfig(updated);
+    handleSaveSectionsConfig(updated);
+  };
+
+  const handleUpdateNoticeField = (field: 'title' | 'message', value: string) => {
+    const currentNotice = sectionsConfig.pauseNotice || DEFAULT_SECTION_VISIBILITY.pauseNotice!;
+    setSectionsConfig({
+      ...sectionsConfig,
+      pauseNotice: {
+        ...currentNotice,
+        [field]: value
+      }
+    });
   };
 
   return (
@@ -1131,6 +1293,20 @@ export default function AdminPanel({
               }`}
             >
               Tarjetas de Servicios
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setAdminTab('sections');
+                setStatusMessage(null);
+              }}
+              className={`px-5 py-3.5 text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer rounded-none border-b-2 ${
+                adminTab === 'sections'
+                  ? 'border-primary text-stone-charcoal bg-white'
+                  : 'border-transparent text-stone-400 hover:text-stone-700 hover:bg-stone-50/50'
+              }`}
+            >
+              Visibilidad de Secciones 👁️
             </button>
             <button
               type="button"
@@ -1310,8 +1486,29 @@ export default function AdminPanel({
                                   Con Foto
                                 </span>
                               )}
+                              {service.visible === false ? (
+                                <span className="flex items-center gap-1 text-[8px] font-bold bg-amber-50 text-amber-800 px-1.5 py-0.5 border border-amber-300">
+                                  <EyeOff className="w-2.5 h-2.5 text-amber-600" />
+                                  Oculta en la web
+                                </span>
+                              ) : (
+                                <span className="flex items-center gap-1 text-[8px] font-medium bg-emerald-50 text-emerald-800 px-1.5 py-0.5 border border-emerald-200">
+                                  <Eye className="w-2.5 h-2.5 text-emerald-600" />
+                                  Visible
+                                </span>
+                              )}
                               <span className="text-[9px] font-mono text-stone-400">
-                                {service.duration} min • {
+                                {(() => {
+                                  const durList = Array.from(
+                                    new Set(
+                                      [
+                                        Number(service.duration),
+                                        ...(Array.isArray(service.durationOptions) ? service.durationOptions.map(Number) : [])
+                                      ].filter((d) => !isNaN(d) && d > 0)
+                                    )
+                                  ).sort((a, b) => a - b);
+                                  return durList.length > 0 ? `${durList.join(' / ')} min` : 'Sin duración';
+                                })()} • {
                                   service.category === 'yoga'
                                     ? `4: $${(service.priceYoga4 || service.price || 0).toLocaleString('es-AR')} | 8: $${(service.priceYoga8 || service.priceYoga8to12 || 0).toLocaleString('es-AR')} | 12: $${(service.priceYoga12 || 0).toLocaleString('es-AR')}`
                                     : (service.price && service.price > 0 ? `$${service.price.toLocaleString('es-AR')}` : 'A consultar')
@@ -1344,6 +1541,18 @@ export default function AdminPanel({
                               </div>
                             ) : (
                               <>
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleServiceVisibility(service.id)}
+                                  title={service.visible === false ? "Hacer visible esta tarjeta en la web" : "Ocultar esta tarjeta de la web"}
+                                  className={`p-2 border transition-all rounded-none cursor-pointer ${
+                                    service.visible === false
+                                      ? 'bg-amber-100 border-amber-400 text-amber-900 hover:bg-amber-200'
+                                      : 'border-stone-borders bg-white text-stone-600 hover:border-stone-charcoal hover:bg-stone-charcoal hover:text-stone-sand'
+                                  }`}
+                                >
+                                  {service.visible === false ? <EyeOff className="h-3.5 w-3.5 text-amber-700" /> : <Eye className="h-3.5 w-3.5" />}
+                                </button>
                                 <button
                                   onClick={() => handleStartEdit(service)}
                                   title="Editar propiedades de tarjeta"
@@ -1411,6 +1620,43 @@ export default function AdminPanel({
                         disabled
                         className="w-full rounded-none border border-stone-borders bg-stone-sand/20 px-3.5 py-2 text-xs font-mono text-stone-500 outline-hidden cursor-not-allowed"
                       />
+                    </div>
+
+                    {/* Control de Visibilidad de la Tarjeta */}
+                    <div className={`p-4 border transition-all ${
+                      editVisible ? 'bg-emerald-50/50 border-emerald-300' : 'bg-amber-50/70 border-amber-300'
+                    }`}>
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            {editVisible ? (
+                              <Eye className="w-4 h-4 text-emerald-600" />
+                            ) : (
+                              <EyeOff className="w-4 h-4 text-amber-600" />
+                            )}
+                            <span className="text-xs font-bold uppercase tracking-wider text-stone-charcoal">
+                              Visibilidad: {editVisible ? 'Visible en la Web' : 'Oculta en la Web'}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-stone-500 font-light mt-1">
+                            {editVisible
+                              ? 'Esta tarjeta se muestra de forma activa en la web y en el sistema de reservas.'
+                              : 'Esta tarjeta está oculta temporalmente. Los alumnos no la verán hasta que la actives.'}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setEditVisible(!editVisible)}
+                          className={`px-3.5 py-2 text-[10px] font-bold uppercase tracking-wider border transition-all cursor-pointer flex items-center justify-center gap-1.5 shrink-0 ${
+                            editVisible
+                              ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-700 shadow-xs'
+                              : 'bg-amber-500 hover:bg-amber-600 text-white border-amber-600 shadow-xs'
+                          }`}
+                        >
+                          {editVisible ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                          {editVisible ? 'Ocultar tarjeta' : 'Hacer visible'}
+                        </button>
+                      </div>
                     </div>
 
                     {/* Title Name */}
@@ -1481,8 +1727,74 @@ export default function AdminPanel({
                           className="w-full rounded-none border border-stone-borders bg-white px-3.5 py-3 text-xs text-stone-charcoal font-sans transition-colors focus:border-stone-charcoal outline-hidden"
                         />
                         <span className="block text-[10px] text-stone-500 italic mt-1 font-sans">
-                          Si colocas 0, la duración no se mostrará en la tarjeta publicada.
+                          Si colocas 0, la duración principal no se mostrará.
                         </span>
+
+                        {/* Extra duration options */}
+                        <div className="mt-3 pt-3 border-t border-stone-borders/60">
+                          <label className="block text-[9px] font-bold uppercase tracking-[0.15em] text-stone-charcoal mb-1.5">
+                            Sumar Opciones de Duración (Minutos)
+                          </label>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="number"
+                              placeholder="Ej: 90"
+                              min="1"
+                              max="480"
+                              value={newDurationInput}
+                              onChange={(e) => setNewDurationInput(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  handleAddDurationOption();
+                                }
+                              }}
+                              className="w-full rounded-none border border-stone-borders bg-white px-3 py-2 text-xs text-stone-charcoal font-sans transition-colors focus:border-stone-charcoal outline-hidden"
+                            />
+                            <button
+                              type="button"
+                              onClick={handleAddDurationOption}
+                              className="shrink-0 flex items-center gap-1 rounded-none bg-stone-charcoal text-[#FDFCF8] text-[9px] font-bold uppercase tracking-wider px-3 py-2.5 hover:bg-primary transition-colors cursor-pointer"
+                            >
+                              <Plus className="w-3 h-3" />
+                              Sumar
+                            </button>
+                          </div>
+
+                          {editDurationOptions.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5 mt-2">
+                              {editDurationOptions.map((mins) => (
+                                <span
+                                  key={mins}
+                                  className="inline-flex items-center gap-1.5 bg-stone-sand/60 border border-stone-borders px-2.5 py-1 text-[10px] font-mono text-stone-charcoal"
+                                >
+                                  {mins} min
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveDurationOption(mins)}
+                                    title="Quitar duración"
+                                    className="text-stone-500 hover:text-red-600 transition-colors cursor-pointer"
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                </span>
+                              ))}
+                            </div>
+                          )}
+
+                          {(() => {
+                            const previewDurations = Array.from(
+                              new Set(
+                                [Number(editDuration), ...editDurationOptions].filter((d) => !isNaN(d) && d > 0)
+                              )
+                            ).sort((a, b) => a - b);
+                            return previewDurations.length > 0 ? (
+                              <span className="block text-[10px] text-stone-500 italic mt-1.5 font-sans">
+                                Vista en tarjeta: {previewDurations.join(' / ')} {editCategory === 'yoga' ? 'minutos por clase' : 'minutos'}
+                              </span>
+                            ) : null;
+                          })()}
+                        </div>
                       </div>
 
                       {editCategory === 'yoga' ? (
@@ -2630,6 +2942,17 @@ export default function AdminPanel({
                                   {estilo.energy}
                                 </span>
                               )}
+                              {estilo.visible === false ? (
+                                <span className="flex items-center gap-1 text-[8px] font-bold bg-amber-50 text-amber-800 px-1.5 py-0.5 border border-amber-300 rounded-xs">
+                                  <EyeOff className="w-2.5 h-2.5 text-amber-600" />
+                                  Oculto en web
+                                </span>
+                              ) : (
+                                <span className="flex items-center gap-1 text-[8px] font-medium bg-emerald-50 text-emerald-800 px-1.5 py-0.5 border border-emerald-200 rounded-xs">
+                                  <Eye className="w-2.5 h-2.5 text-emerald-600" />
+                                  Visible
+                                </span>
+                              )}
                               <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-xs inline-flex items-center gap-1 transition-colors ${
                                 isCurrentlySelected
                                   ? 'bg-stone-charcoal text-white'
@@ -2707,6 +3030,19 @@ export default function AdminPanel({
                                   title="Mover abajo"
                                 >
                                   <ArrowDown className="h-3.5 w-3.5" />
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleEstiloVisibility(estilo.id || `estilo-${idx}`)}
+                                  className={`p-1.5 border transition-all cursor-pointer ${
+                                    estilo.visible === false
+                                      ? 'bg-amber-100 border-amber-400 text-amber-900 hover:bg-amber-200'
+                                      : 'border-stone-borders text-stone-600 hover:bg-stone-sand'
+                                  }`}
+                                  title={estilo.visible === false ? "Hacer visible este estilo en la web" : "Ocultar este estilo de la web"}
+                                >
+                                  {estilo.visible === false ? <EyeOff className="h-3.5 w-3.5 text-amber-700" /> : <Eye className="h-3.5 w-3.5" />}
                                 </button>
 
                                 <button
@@ -2871,6 +3207,43 @@ export default function AdminPanel({
                             className="w-full rounded-none border border-stone-borders bg-white py-2 px-3 text-xs text-stone-charcoal focus:border-stone-charcoal focus:outline-hidden resize-none leading-relaxed"
                           />
                         </div>
+
+                        {/* Control de Visibilidad del Tarjetón */}
+                        <div className={`p-4 border transition-all ${
+                          estiloVisibleInput ? 'bg-emerald-50/50 border-emerald-300' : 'bg-amber-50/70 border-amber-300'
+                        }`}>
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                {estiloVisibleInput ? (
+                                  <Eye className="w-4 h-4 text-emerald-600" />
+                                ) : (
+                                  <EyeOff className="w-4 h-4 text-amber-600" />
+                                )}
+                                <span className="text-xs font-bold uppercase tracking-wider text-stone-charcoal">
+                                  Visibilidad: {estiloVisibleInput ? 'Visible en la Web' : 'Oculto en la Web'}
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-stone-500 font-light mt-1">
+                                {estiloVisibleInput
+                                  ? 'Este tarjetón aparece activo en el slider de Estilos de Práctica para los visitantes.'
+                                  : 'Este tarjetón está oculto temporalmente. Podrás reactivarlo cuando lo desees.'}
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setEstiloVisibleInput(!estiloVisibleInput)}
+                              className={`px-3.5 py-2 text-[10px] font-bold uppercase tracking-wider border transition-all cursor-pointer flex items-center justify-center gap-1.5 shrink-0 ${
+                                estiloVisibleInput
+                                  ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-700 shadow-xs'
+                                  : 'bg-amber-500 hover:bg-amber-600 text-white border-amber-600 shadow-xs'
+                              }`}
+                            >
+                              {estiloVisibleInput ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                              {estiloVisibleInput ? 'Ocultar tarjetón' : 'Hacer visible'}
+                            </button>
+                          </div>
+                        </div>
                       </div>
 
                       {/* Action buttons */}
@@ -2902,6 +3275,318 @@ export default function AdminPanel({
                     </div>
                   )}
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 6: GESTIÓN DE VISIBILIDAD DE SECCIONES Y PAUSA TEMPORAL */}
+          {adminTab === 'sections' && (
+            <div className="space-y-8 animate-fadeIn">
+              {/* Header Box */}
+              <div className="border border-stone-borders bg-white p-6 sm:p-8">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-6 border-b border-stone-borders">
+                  <div>
+                    <h3 className="font-serif italic text-2xl text-stone-charcoal font-normal flex items-center gap-2">
+                      <Eye className="h-6 w-6 text-primary" />
+                      Visibilidad de Secciones en la Web
+                    </h3>
+                    <p className="text-xs text-stone-500 font-serif italic mt-1 max-w-2xl">
+                      Controla qué bloques se visualizan en la página web pública y en el menú de navegación. Si estás en una pausa o receso, puedes ocultar con un solo clic las secciones que tengan información desactualizada (como Clases regulares o Terapias), y volver a activarlas cuando retomes tus actividades.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={saveSectionsLoading}
+                    onClick={() => handleSaveSectionsConfig()}
+                    className="flex items-center gap-2 px-5 py-3 bg-stone-charcoal hover:bg-emerald-700 text-white font-bold text-xs uppercase tracking-wider transition-colors shadow-sm cursor-pointer shrink-0"
+                  >
+                    <Save className="h-4 w-4" />
+                    {saveSectionsLoading ? 'Guardando...' : 'Sincronizar Cambios'}
+                  </button>
+                </div>
+
+                {/* 5 Section Toggle Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+                  {/* 1. Yoga */}
+                  <div className={`p-5 border transition-all ${
+                    sectionsConfig.yoga 
+                      ? 'bg-stone-50/60 border-stone-borders' 
+                      : 'bg-amber-50/40 border-amber-200/80'
+                  }`}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">🧘</span>
+                          <h4 className="font-serif font-bold text-base text-stone-charcoal">
+                            1. Sección Yoga
+                          </h4>
+                        </div>
+                        <p className="text-xs text-stone-600 font-serif italic mt-1 leading-relaxed">
+                          Fotografía principal (Yin-Yang) y texto introductorio: <em>"Yoga, medicina para la vida moderna"</em>.
+                        </p>
+                        <div className="mt-3 flex items-center gap-2">
+                          <span className={`inline-flex items-center px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                            sectionsConfig.yoga 
+                              ? 'bg-emerald-100 text-emerald-800' 
+                              : 'bg-amber-100 text-amber-800'
+                          }`}>
+                            {sectionsConfig.yoga ? 'Visible en la web' : 'Oculta en la web'}
+                          </span>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleToggleSection('yoga')}
+                        className={`p-2.5 rounded-full border transition-colors cursor-pointer shrink-0 ${
+                          sectionsConfig.yoga
+                            ? 'bg-emerald-500 border-emerald-600 text-white hover:bg-emerald-600'
+                            : 'bg-stone-200 border-stone-300 text-stone-600 hover:bg-stone-300'
+                        }`}
+                        title={sectionsConfig.yoga ? 'Ocultar sección Yoga' : 'Mostrar sección Yoga'}
+                      >
+                        {sectionsConfig.yoga ? <Eye className="h-5 w-5" /> : <EyeOff className="h-5 w-5" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* 2. Horarios y Abonos (Clases) */}
+                  <div className={`p-5 border transition-all ${
+                    sectionsConfig.horarios 
+                      ? 'bg-stone-50/60 border-stone-borders' 
+                      : 'bg-amber-50/40 border-amber-200/80'
+                  }`}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">📅</span>
+                          <h4 className="font-serif font-bold text-base text-stone-charcoal">
+                            2. Clases & Horarios
+                          </h4>
+                        </div>
+                        <p className="text-xs text-stone-600 font-serif italic mt-1 leading-relaxed">
+                          Grilla de horarios semanales y abonos mensuales (4, 8, 12 clases y pase libre).
+                        </p>
+                        <div className="mt-3 flex items-center gap-2">
+                          <span className={`inline-flex items-center px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                            sectionsConfig.horarios 
+                              ? 'bg-emerald-100 text-emerald-800' 
+                              : 'bg-amber-100 text-amber-800'
+                          }`}>
+                            {sectionsConfig.horarios ? 'Visible en la web' : 'Oculta (Recomendado en pausa)'}
+                          </span>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleToggleSection('horarios')}
+                        className={`p-2.5 rounded-full border transition-colors cursor-pointer shrink-0 ${
+                          sectionsConfig.horarios
+                            ? 'bg-emerald-500 border-emerald-600 text-white hover:bg-emerald-600'
+                            : 'bg-stone-200 border-stone-300 text-stone-600 hover:bg-stone-300'
+                        }`}
+                        title={sectionsConfig.horarios ? 'Ocultar sección Clases' : 'Mostrar sección Clases'}
+                      >
+                        {sectionsConfig.horarios ? <Eye className="h-5 w-5" /> : <EyeOff className="h-5 w-5" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* 3. Terapias y Sesiones */}
+                  <div className={`p-5 border transition-all ${
+                    sectionsConfig.terapias 
+                      ? 'bg-stone-50/60 border-stone-borders' 
+                      : 'bg-amber-50/40 border-amber-200/80'
+                  }`}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">✨</span>
+                          <h4 className="font-serif font-bold text-base text-stone-charcoal">
+                            3. Terapias & Sesiones
+                          </h4>
+                        </div>
+                        <p className="text-xs text-stone-600 font-serif italic mt-1 leading-relaxed">
+                          Catálogo de sesiones individuales (Shiatsu, Reiki, Masajes) y botón para reservar turnos.
+                        </p>
+                        <div className="mt-3 flex items-center gap-2">
+                          <span className={`inline-flex items-center px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                            sectionsConfig.terapias 
+                              ? 'bg-emerald-100 text-emerald-800' 
+                              : 'bg-amber-100 text-amber-800'
+                          }`}>
+                            {sectionsConfig.terapias ? 'Visible en la web' : 'Oculta (Recomendado en pausa)'}
+                          </span>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleToggleSection('terapias')}
+                        className={`p-2.5 rounded-full border transition-colors cursor-pointer shrink-0 ${
+                          sectionsConfig.terapias
+                            ? 'bg-emerald-500 border-emerald-600 text-white hover:bg-emerald-600'
+                            : 'bg-stone-200 border-stone-300 text-stone-600 hover:bg-stone-300'
+                        }`}
+                        title={sectionsConfig.terapias ? 'Ocultar sección Terapias' : 'Mostrar sección Terapias'}
+                      >
+                        {sectionsConfig.terapias ? <Eye className="h-5 w-5" /> : <EyeOff className="h-5 w-5" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* 4. Sobre mí (Clara) */}
+                  <div className={`p-5 border transition-all ${
+                    sectionsConfig.bio 
+                      ? 'bg-stone-50/60 border-stone-borders' 
+                      : 'bg-amber-50/40 border-amber-200/80'
+                  }`}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">🌿</span>
+                          <h4 className="font-serif font-bold text-base text-stone-charcoal">
+                            4. Sección Sobre mí
+                          </h4>
+                        </div>
+                        <p className="text-xs text-stone-600 font-serif italic mt-1 leading-relaxed">
+                          Foto Bio, historia de Clara, formación profesional en comunicación y trayectoria en el yoga.
+                        </p>
+                        <div className="mt-3 flex items-center gap-2">
+                          <span className={`inline-flex items-center px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                            sectionsConfig.bio 
+                              ? 'bg-emerald-100 text-emerald-800' 
+                              : 'bg-amber-100 text-amber-800'
+                          }`}>
+                            {sectionsConfig.bio ? 'Visible en la web' : 'Oculta en la web'}
+                          </span>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleToggleSection('bio')}
+                        className={`p-2.5 rounded-full border transition-colors cursor-pointer shrink-0 ${
+                          sectionsConfig.bio
+                            ? 'bg-emerald-500 border-emerald-600 text-white hover:bg-emerald-600'
+                            : 'bg-stone-200 border-stone-300 text-stone-600 hover:bg-stone-300'
+                        }`}
+                        title={sectionsConfig.bio ? 'Ocultar sección Sobre mí' : 'Mostrar sección Sobre mí'}
+                      >
+                        {sectionsConfig.bio ? <Eye className="h-5 w-5" /> : <EyeOff className="h-5 w-5" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* 5. Contacto */}
+                  <div className={`p-5 border md:col-span-2 transition-all ${
+                    sectionsConfig.contacto 
+                      ? 'bg-stone-50/60 border-stone-borders' 
+                      : 'bg-amber-50/40 border-amber-200/80'
+                  }`}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">💬</span>
+                          <h4 className="font-serif font-bold text-base text-stone-charcoal">
+                            5. Sección Contacto & Pie de página
+                          </h4>
+                        </div>
+                        <p className="text-xs text-stone-600 font-serif italic mt-1 leading-relaxed">
+                          Formulario para enviar consultas directas, botón a WhatsApp, ubicación y redes sociales.
+                        </p>
+                        <div className="mt-3 flex items-center gap-2">
+                          <span className={`inline-flex items-center px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                            sectionsConfig.contacto 
+                              ? 'bg-emerald-100 text-emerald-800' 
+                              : 'bg-amber-100 text-amber-800'
+                          }`}>
+                            {sectionsConfig.contacto ? 'Visible en la web' : 'Oculta en la web'}
+                          </span>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleToggleSection('contacto')}
+                        className={`p-2.5 rounded-full border transition-colors cursor-pointer shrink-0 ${
+                          sectionsConfig.contacto
+                            ? 'bg-emerald-500 border-emerald-600 text-white hover:bg-emerald-600'
+                            : 'bg-stone-200 border-stone-300 text-stone-600 hover:bg-stone-300'
+                        }`}
+                        title={sectionsConfig.contacto ? 'Ocultar sección Contacto' : 'Mostrar sección Contacto'}
+                      >
+                        {sectionsConfig.contacto ? <Eye className="h-5 w-5" /> : <EyeOff className="h-5 w-5" />}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* PAUSA TEMPORAL / AVISO INFORMATIVO BOX */}
+                <div className="mt-8 pt-8 border-t border-stone-borders">
+                  <div className="bg-[#f9f6f0] border border-[#e8dfd5] p-6 sm:p-7">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-[#e8dfd5]">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xl">📢</span>
+                          <h4 className="font-serif font-bold text-lg text-stone-charcoal">
+                            Aviso de Pausa Temporal o Receso (Opcional)
+                          </h4>
+                        </div>
+                        <p className="text-xs text-stone-600 font-serif italic mt-1 max-w-xl">
+                          Si estás en una pausa, puedes mostrar un cartel discreto y cálido al inicio de la página para que los alumnos sepan que estás en receso y puedan escribirte a WhatsApp.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleTogglePauseNotice}
+                        className={`flex items-center gap-2 px-4 py-2 text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer shrink-0 border ${
+                          sectionsConfig.pauseNotice?.enabled
+                            ? 'bg-amber-600 border-amber-700 text-white hover:bg-amber-700'
+                            : 'bg-white border-stone-borders text-stone-700 hover:bg-stone-100'
+                        }`}
+                      >
+                        {sectionsConfig.pauseNotice?.enabled ? 'Aviso Activado' : 'Aviso Desactivado'}
+                      </button>
+                    </div>
+
+                    {sectionsConfig.pauseNotice?.enabled && (
+                      <div className="mt-5 space-y-4">
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold uppercase tracking-widest text-stone-600 block">
+                            Título del cartel de pausa
+                          </label>
+                          <input
+                            type="text"
+                            value={sectionsConfig.pauseNotice.title || ''}
+                            onChange={(e) => handleUpdateNoticeField('title', e.target.value)}
+                            placeholder="Ej: Pausa temporal en actividades"
+                            className="w-full border border-stone-borders bg-white py-2 px-3 text-xs text-stone-charcoal focus:border-stone-charcoal focus:outline-hidden font-medium"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold uppercase tracking-widest text-stone-600 block">
+                            Mensaje explicativo para tus alumnos
+                          </label>
+                          <textarea
+                            rows={3}
+                            value={sectionsConfig.pauseNotice.message || ''}
+                            onChange={(e) => handleUpdateNoticeField('message', e.target.value)}
+                            placeholder="Ej: En este momento estamos en una pausa. Para novedades o consultas directas, puedes escribirnos por WhatsApp."
+                            className="w-full border border-stone-borders bg-white py-2 px-3 text-xs text-stone-charcoal focus:border-stone-charcoal focus:outline-hidden font-serif italic"
+                          />
+                        </div>
+                        <div className="pt-2 flex justify-end">
+                          <button
+                            type="button"
+                            disabled={saveSectionsLoading}
+                            onClick={() => handleSaveSectionsConfig()}
+                            className="px-4 py-2 bg-stone-charcoal hover:bg-emerald-700 text-white font-bold text-xs uppercase tracking-wider transition-colors cursor-pointer"
+                          >
+                            Guardar texto del aviso
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
               </div>
             </div>
           )}

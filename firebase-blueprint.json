@@ -18,9 +18,9 @@
     },
     "services": {
       "title": "Yoga Services",
-      "description": "Yoga service cards and descriptions",
+      "description": "Yoga and therapy service cards, pricing, and visibility settings",
       "fields": {
-        "services": { "type": "array", "description": "List of service objects" },
+        "services": { "type": "array", "description": "List of service objects with name, category, duration, durationOptions, prices, benefits, and visible toggle" },
         "updatedAt": { "type": "string", "description": "ISO timestamp" }
       }
     },
@@ -49,9 +49,9 @@
     },
     "estilos": {
       "title": "Practice Styles",
-      "description": "Dynamic single-card slider styles with images, energy badges, titles, and descriptions",
+      "description": "Dynamic single-card slider styles with images, energy badges, titles, descriptions, and visible toggle",
       "fields": {
-        "estilos": { "type": "array", "description": "List of practice style objects" },
+        "estilos": { "type": "array", "description": "List of practice style objects with visible toggle" },
         "updatedAt": { "type": "string", "description": "ISO timestamp" }
       }
     }

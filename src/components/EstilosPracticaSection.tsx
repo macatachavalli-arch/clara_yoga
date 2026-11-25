@@ -10,13 +10,14 @@ interface EstilosPracticaSectionProps {
 }
 
 export default function EstilosPracticaSection({ estilos, onAdminClick }: EstilosPracticaSectionProps) {
-  const items = estilos && estilos.length > 0 ? estilos : DEFAULT_PRACTICE_STYLES;
+  const allItems = estilos && estilos.length > 0 ? estilos : DEFAULT_PRACTICE_STYLES;
+  const items = allItems.filter((item) => item.visible !== false);
   const [currentIndex, setCurrentIndex] = useState<number>(0);
   const [touchStart, setTouchStart] = useState<number | null>(null);
 
   // Safe index bounds if items change
-  const activeIndex = currentIndex >= items.length ? 0 : currentIndex;
-  const currentItem = items[activeIndex] || items[0];
+  const activeIndex = items.length > 0 && currentIndex < items.length ? currentIndex : 0;
+  const currentItem = items.length > 0 ? (items[activeIndex] || items[0]) : null;
 
   const handlePrev = useCallback(() => {
     setCurrentIndex((prev) => (prev <= 0 ? items.length - 1 : prev - 1));
@@ -71,14 +72,21 @@ export default function EstilosPracticaSection({ estilos, onAdminClick }: Estilo
         </div>
 
         {/* Big Dynamic Card Slider (Tarjetón Dinámico) */}
-        <div 
-          id="estilos-slider-card"
-          className="bg-white rounded-2xl md:rounded-3xl shadow-sm border border-stone-300 overflow-hidden flex flex-col md:flex-row min-h-[460px] md:min-h-[500px] relative w-full"
-          onTouchStart={handleTouchStart}
-          onTouchEnd={handleTouchEnd}
-        >
-          {/* LEFT SIDE: Image extending to the outer edges */}
-          <div className="w-full md:w-1/2 relative min-h-[260px] sm:min-h-[320px] md:min-h-full overflow-hidden shrink-0 bg-stone-100">
+        {!currentItem ? (
+          <div className="max-w-md mx-auto text-center p-8 bg-white/90 backdrop-blur-xs rounded-xl border border-stone-200 shadow-xs">
+            <p className="font-serif italic text-stone-600 text-sm">
+              Esta sección está en actualización. Vuelve a visitarnos pronto para conocer nuestros estilos de práctica.
+            </p>
+          </div>
+        ) : (
+          <div 
+            id="estilos-slider-card"
+            className="bg-white rounded-2xl md:rounded-3xl shadow-sm border border-stone-300 overflow-hidden flex flex-col md:flex-row min-h-[460px] md:min-h-[500px] relative w-full"
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
+          >
+            {/* LEFT SIDE: Image extending to the outer edges */}
+            <div className="w-full md:w-1/2 relative min-h-[260px] sm:min-h-[320px] md:min-h-full overflow-hidden shrink-0 bg-stone-100">
             <AnimatePresence mode="wait">
               <motion.div
                 key={currentItem.id || activeIndex}
@@ -174,6 +182,7 @@ export default function EstilosPracticaSection({ estilos, onAdminClick }: Estilo
             </div>
           </div>
         </div>
+        )}
       </div>
     </section>
   );

@@ -8,7 +8,6 @@ import { motion, AnimatePresence } from 'motion/react';
 import Navbar from './components/Navbar';
 import Hero from './components/Hero';
 import YogaExplainerSection from './components/YogaExplainerSection';
-import EstilosPracticaSection from './components/EstilosPracticaSection';
 import HorariosSection from './components/HorariosSection';
 import ServicesPanel from './components/ServicesPanel';
 import BookingForm from './components/BookingForm';
@@ -20,13 +19,15 @@ import ContactSection from './components/ContactSection';
 import ZenBackgroundAudio from './components/ZenBackgroundAudio';
 import FloatingNav from './components/FloatingNav';
 import { SERVICES, DEFAULT_CAROUSEL_SLIDES, DEFAULT_PRACTICE_STYLES } from './data';
-import { Booking, Service, BlockedSlot, CarouselSlide, PracticeStyle } from './types';
+import { Booking, Service, BlockedSlot, CarouselSlide, PracticeStyle, SectionVisibility, DEFAULT_SECTION_VISIBILITY } from './types';
 import { 
   getServicesFromFirestore, 
   getBlockedSlotsFromFirestore, 
   getBookingsFromFirestore,
   getCarouselFromFirestore,
-  getEstilosFromFirestore
+  getEstilosFromFirestore,
+  getSectionVisibilityFromFirestore,
+  saveSectionVisibilityToFirestore
 } from './lib/firestoreStorage';
 
 export default function App() {
@@ -75,10 +76,23 @@ export default function App() {
     return DEFAULT_PRACTICE_STYLES;
   });
 
+  const [sectionVisibility, setSectionVisibility] = useState<SectionVisibility>(() => {
+    try {
+      const cached = localStorage.getItem('clara_cached_section_visibility');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed && typeof parsed === 'object') return parsed;
+      }
+    } catch (e) {
+      console.warn(e);
+    }
+    return DEFAULT_SECTION_VISIBILITY;
+  });
+
   const [blockedSlots, setBlockedSlots] = useState<BlockedSlot[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [isAdminActive, setIsAdminActive] = useState<boolean>(false);
-  const [adminInitialTab, setAdminInitialTab] = useState<'services' | 'carousel' | 'blocks' | 'bookings' | 'estilos'>('services');
+  const [adminInitialTab, setAdminInitialTab] = useState<'services' | 'carousel' | 'blocks' | 'bookings' | 'estilos' | 'sections'>('services');
 
   // Fetch updated services list, blocked slots and bookings on startup/refresh
   useEffect(() => {
@@ -191,9 +205,33 @@ export default function App() {
       }
     };
 
+    const fetchSectionVisibility = async () => {
+      try {
+        const resp = await fetch('/api/section-visibility', { cache: 'no-store' });
+        if (resp.ok) {
+          const data = await resp.json();
+          if (data.success && data.sections) {
+            setSectionVisibility(data.sections);
+            try {
+              localStorage.setItem('clara_cached_section_visibility', JSON.stringify(data.sections));
+            } catch (e) { console.warn(e); }
+            return;
+          }
+        }
+      } catch (err) {
+        console.warn('Backend API unavailable. Fetching section visibility from Firestore.', err);
+      }
+
+      const fsVisibility = await getSectionVisibilityFromFirestore();
+      if (fsVisibility) {
+        setSectionVisibility(fsVisibility);
+      }
+    };
+
     fetchServices();
     fetchCarousel();
     fetchEstilos();
+    fetchSectionVisibility();
     fetchBlockedSlots();
     fetchBookings();
   }, [refreshFlag]);
@@ -242,6 +280,7 @@ export default function App() {
           'yoga-explainer': 'yoga',
           'estilos-practica': 'estilos',
           'horarios-section': 'horarios',
+          'clases': 'horarios',
           'services-section': 'terapias',
           'servicios': 'terapias',
           'therapeutic-team-section': 'bio',
@@ -332,6 +371,8 @@ export default function App() {
           onCarouselUpdated={(updated) => setYogaSlides(updated)}
           estilos={estilos}
           onEstilosUpdated={(updated) => setEstilos(updated)}
+          sectionVisibility={sectionVisibility}
+          onSectionVisibilityUpdated={(updated) => setSectionVisibility(updated)}
         />
       ) : (
         <>
@@ -339,6 +380,7 @@ export default function App() {
           <FloatingNav 
             activeTab={activeTab}
             setActiveTab={handleTabChange}
+            sectionVisibility={sectionVisibility}
           />
 
           {/* Main Dynamic Workspace body */}
@@ -359,32 +401,73 @@ export default function App() {
                     onMyBookings={() => handleTabChange('my-bookings')}
                   />
                   
-                  {/* Screen 2: Yoga (Introducción y Método con Carrusel de 3 fotos) */}
-                  <YogaExplainerSection slides={yogaSlides} />
+                  {/* Cartel informativo de Pausa Temporal / Receso (Opcional) */}
+                  {sectionVisibility.pauseNotice?.enabled && (
+                    <section id="aviso-pausa" className="bg-[#FAF7F2] border-y border-[#E3DAC9] py-8 px-4 sm:px-6 md:px-8 text-stone-charcoal relative z-20">
+                      <div className="max-w-4xl mx-auto flex flex-col md:flex-row items-center justify-between gap-5 text-center md:text-left">
+                        <div className="flex items-start sm:items-center gap-3.5">
+                          <span className="text-2xl sm:text-3xl p-2 bg-[#F3EDE2] rounded-full border border-[#D5C9B8] shrink-0">🌿</span>
+                          <div>
+                            <h3 className="font-serif text-lg sm:text-xl font-medium text-stone-charcoal tracking-wide">
+                              {sectionVisibility.pauseNotice.title || 'Pausa temporal en actividades'}
+                            </h3>
+                            <p className="text-xs sm:text-sm text-stone-600 font-serif italic mt-1 leading-relaxed max-w-2xl">
+                              {sectionVisibility.pauseNotice.message || 'En este momento estamos en una pausa. Para novedades o consultas directas, puedes escribirnos por WhatsApp.'}
+                            </p>
+                          </div>
+                        </div>
+                        <a
+                          href="https://wa.me/34600000000"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-2 px-6 py-3 bg-[#25D366] hover:bg-[#20ba5a] text-white text-[11px] tracking-[0.18em] uppercase font-bold transition-all shadow-sm hover:shadow shrink-0"
+                        >
+                          <span>Escribir por WhatsApp</span>
+                        </a>
+                      </div>
+                    </section>
+                  )}
 
-                  {/* Screen 3: Estilos de Práctica (Dynamic Slider) */}
-                  <EstilosPracticaSection 
-                    estilos={estilos} 
-                    onAdminClick={() => {
-                      setAdminInitialTab('estilos');
-                      setIsAdminActive(true);
-                    }}
-                  />
+                  {/* Screen 2: Yoga */}
+                  {sectionVisibility.yoga && (
+                    <YogaExplainerSection slides={yogaSlides} />
+                  )}
 
-                  {/* Screen 4: Horarios & Abonos */}
-                  <HorariosSection services={services} />
+                  {/* Screen 3: Horarios & Abonos */}
+                  {sectionVisibility.horarios && (
+                    <HorariosSection services={services} />
+                  )}
 
                   {/* Screen 5: Sesiones & Terapias */}
-                  <ServicesPanel services={services} onSelectService={handleSelectServiceDirectly} />
+                  {sectionVisibility.terapias && (
+                    <ServicesPanel services={services} onSelectService={handleSelectServiceDirectly} />
+                  )}
                   
                   {/* Screen 6: Bío (Clara) */}
-                  <TherapeuticTeam />
+                  {sectionVisibility.bio && (
+                    <TherapeuticTeam />
+                  )}
 
                   {/* Screen 7: Contacto */}
-                  <ContactSection onAdminClick={() => {
-                    setAdminInitialTab('services');
-                    setIsAdminActive(true);
-                  }} />
+                  {sectionVisibility.contacto ? (
+                    <ContactSection onAdminClick={() => {
+                      setAdminInitialTab('services');
+                      setIsAdminActive(true);
+                    }} />
+                  ) : (
+                    /* Si Clara decide ocultar Contacto, proveer acceso seguro para ingresar al panel de control */
+                    <div className="py-6 text-center border-t border-stone-200/50 bg-stone-100/40">
+                      <button
+                        onClick={() => {
+                          setAdminInitialTab('sections');
+                          setIsAdminActive(true);
+                        }}
+                        className="text-[11px] uppercase tracking-widest text-stone-400 hover:text-stone-700 transition-colors cursor-pointer"
+                      >
+                        ⚙️ Panel de Gestión (Clara)
+                      </button>
+                    </div>
+                  )}
                 </motion.div>
               )}
 

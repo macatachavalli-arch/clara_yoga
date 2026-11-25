@@ -8,160 +8,84 @@ import { Volume2, VolumeX } from 'lucide-react';
 
 export default function ZenBackgroundAudio() {
   const [isPlaying, setIsPlaying] = useState(false);
-  const audioCtxRef = useRef<AudioContext | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const fadeIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  const startZenSound = () => {
-    if (audioCtxRef.current && audioCtxRef.current.state === 'running') {
-      return;
-    }
+  useEffect(() => {
+    // Create and configure the real nature recording audio element
+    const audio = new Audio('/audio/naturaleza_clara.mp3');
+    audio.loop = true;
+    audio.preload = 'auto';
+    audio.volume = 0; // Starts at 0 for smooth fade-in
+    audioRef.current = audio;
 
-    try {
-      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-      const ctx = new AudioCtx();
-      audioCtxRef.current = ctx;
+    const handleEnded = () => {
+      // Loop backup for older browsers
+      audio.currentTime = 0;
+      audio.play().catch(() => {});
+    };
+    audio.addEventListener('ended', handleEnded);
 
-      const masterGain = ctx.createGain();
-      masterGain.gain.setValueAtTime(0.18, ctx.currentTime);
-      masterGain.connect(ctx.destination);
+    return () => {
+      audio.removeEventListener('ended', handleEnded);
+      if (fadeIntervalRef.current) clearInterval(fadeIntervalRef.current);
+      audio.pause();
+      audio.src = '';
+      audioRef.current = null;
+    };
+  }, []);
 
-      // 1. Soothing Ocean Waves / Gentle Breeze (Pink noise + modulated lowpass filter)
-      const bufferSize = 2 * ctx.sampleRate;
-      const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-      const output = noiseBuffer.getChannelData(0);
-      let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
-
-      for (let i = 0; i < bufferSize; i++) {
-        const white = Math.random() * 2 - 1;
-        b0 = 0.99886 * b0 + white * 0.0555179;
-        b1 = 0.99332 * b1 + white * 0.0750759;
-        b2 = 0.96900 * b2 + white * 0.1538520;
-        b3 = 0.86650 * b3 + white * 0.3104856;
-        b4 = 0.55000 * b4 + white * 0.5329522;
-        b5 = -0.7616 * b5 - white * 0.0168980;
-        output[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362) * 0.035;
-        b6 = white * 0.115926;
-      }
-
-      const noiseSource = ctx.createBufferSource();
-      noiseSource.buffer = noiseBuffer;
-      noiseSource.loop = true;
-
-      // Filter for wave swell motion
-      const waveFilter = ctx.createBiquadFilter();
-      waveFilter.type = 'lowpass';
-      waveFilter.frequency.setValueAtTime(280, ctx.currentTime);
-
-      // LFO for wave swelling effect
-      const lfo = ctx.createOscillator();
-      lfo.frequency.setValueAtTime(0.1, ctx.currentTime); // 1 cycle every ~10 seconds
-      const lfoGain = ctx.createGain();
-      lfoGain.gain.setValueAtTime(220, ctx.currentTime); // modulate frequency
-
-      lfo.connect(lfoGain);
-      lfoGain.connect(waveFilter.frequency);
-
-      noiseSource.connect(waveFilter);
-      waveFilter.connect(masterGain);
-
-      noiseSource.start();
-      lfo.start();
-
-      // 2. Gentle Zen Chime / Singing Bowl tones at 432Hz harmonics
-      const playChime = () => {
-        if (!audioCtxRef.current || audioCtxRef.current.state !== 'running') return;
-        const freqs = [216, 288, 324, 432, 576]; // Zen pentatonic scale
-        const freq = freqs[Math.floor(Math.random() * freqs.length)];
-
-        const osc = ctx.createOscillator();
-        const chimeGain = ctx.createGain();
-
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(freq, ctx.currentTime);
-
-        chimeGain.gain.setValueAtTime(0, ctx.currentTime);
-        chimeGain.gain.linearRampToValueAtTime(0.035, ctx.currentTime + 1.8);
-        chimeGain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 8);
-
-        osc.connect(chimeGain);
-        chimeGain.connect(masterGain);
-
-        osc.start();
-        osc.stop(ctx.currentTime + 8.5);
-      };
-
-      // Play initial warm chime
-      setTimeout(() => playChime(), 800);
-
-      // Interval for periodic soft chimes
-      const chimeInterval = setInterval(() => {
-        playChime();
-      }, 7500);
-
-      (ctx as unknown as { _chimeInterval: NodeJS.Timeout })._chimeInterval = chimeInterval;
-
+  const fadeIn = (audio: HTMLAudioElement, targetVolume = 0.45) => {
+    if (fadeIntervalRef.current) clearInterval(fadeIntervalRef.current);
+    audio.volume = 0;
+    audio.play().then(() => {
       setIsPlaying(true);
-    } catch (e) {
-      console.error('Audio initialization error:', e);
-    }
+      let vol = 0;
+      fadeIntervalRef.current = setInterval(() => {
+        vol = Math.min(targetVolume, vol + 0.05);
+        if (audioRef.current) audioRef.current.volume = vol;
+        if (vol >= targetVolume) {
+          if (fadeIntervalRef.current) clearInterval(fadeIntervalRef.current);
+        }
+      }, 70);
+    }).catch((err) => {
+      console.warn('Audio play request blocked or unavailable:', err);
+      setIsPlaying(false);
+    });
   };
 
-  const stopZenSound = () => {
-    if (audioCtxRef.current) {
-      const ctx = audioCtxRef.current as unknown as { _chimeInterval?: NodeJS.Timeout } & AudioContext;
-      if (ctx._chimeInterval) clearInterval(ctx._chimeInterval);
-      ctx.close();
-      audioCtxRef.current = null;
-    }
-    setIsPlaying(false);
+  const fadeOut = (audio: HTMLAudioElement) => {
+    if (fadeIntervalRef.current) clearInterval(fadeIntervalRef.current);
+    let vol = audio.volume;
+    fadeIntervalRef.current = setInterval(() => {
+      vol = Math.max(0, vol - 0.08);
+      if (audioRef.current) audioRef.current.volume = vol;
+      if (vol <= 0.01) {
+        if (fadeIntervalRef.current) clearInterval(fadeIntervalRef.current);
+        audio.pause();
+        setIsPlaying(false);
+      }
+    }, 50);
   };
 
   const toggleSound = () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
     if (isPlaying) {
-      stopZenSound();
+      fadeOut(audio);
     } else {
-      startZenSound();
+      fadeIn(audio, 0.45);
     }
   };
-
-  useEffect(() => {
-    // Attempt auto-start sound on load or on first user gesture anywhere on page
-    const tryAutoPlay = () => {
-      startZenSound();
-    };
-
-    tryAutoPlay();
-
-    const handleFirstGesture = () => {
-      if (!audioCtxRef.current || audioCtxRef.current.state === 'suspended') {
-        startZenSound();
-      }
-      window.removeEventListener('click', handleFirstGesture);
-      window.removeEventListener('touchstart', handleFirstGesture);
-      window.removeEventListener('scroll', handleFirstGesture);
-      window.removeEventListener('mousemove', handleFirstGesture);
-    };
-
-    window.addEventListener('click', handleFirstGesture);
-    window.addEventListener('touchstart', handleFirstGesture);
-    window.addEventListener('scroll', handleFirstGesture);
-    window.addEventListener('mousemove', handleFirstGesture);
-
-    return () => {
-      window.removeEventListener('click', handleFirstGesture);
-      window.removeEventListener('touchstart', handleFirstGesture);
-      window.removeEventListener('scroll', handleFirstGesture);
-      window.removeEventListener('mousemove', handleFirstGesture);
-      stopZenSound();
-    };
-  }, []);
 
   return (
     <button
       onClick={toggleSound}
-      title={isPlaying ? "Silenciar ambiente zen" : "Activar sonido zen"}
+      title={isPlaying ? "Silenciar sonido de la naturaleza" : "Escuchar ambiente de la naturaleza (arroyo, pájaros y cristal)"}
       className="fixed bottom-4 right-4 z-40 flex items-center justify-center h-10 w-10 rounded-full bg-stone-900/80 backdrop-blur-md border border-[#dcdcdc]/40 hover:border-[#dcdcdc] hover:bg-stone-900 transition-all shadow-lg cursor-pointer"
       style={{ color: '#dcdcdc' }}
-      aria-label="Sonidos de la naturaleza zen"
+      aria-label="Sonido sereno de naturaleza con agua, pájaros y cristal"
     >
       {isPlaying ? (
         <Volume2 className="h-5 w-5 animate-pulse" style={{ color: '#dcdcdc' }} />

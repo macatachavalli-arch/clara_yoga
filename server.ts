@@ -36,6 +36,7 @@ async function startServer() {
   const CAROUSEL2_FILE = path.join(process.cwd(), 'carousel2.json');
   const QUICK_BUTTONS_FILE = path.join(process.cwd(), 'quick_buttons.json');
   const ESTILOS_FILE = path.join(process.cwd(), 'estilos.json');
+  const SECTIONS_FILE = path.join(process.cwd(), 'sections.json');
   const UPLOADS_DIR = path.join(process.cwd(), 'public', 'uploads');
 
   if (!fs.existsSync(UPLOADS_DIR)) {
@@ -282,6 +283,52 @@ async function startServer() {
     }
   };
 
+  const DEFAULT_SECTIONS_CONFIG = {
+    yoga: true,
+    horarios: true,
+    terapias: true,
+    bio: true,
+    contacto: true,
+    pauseNotice: {
+      enabled: false,
+      title: 'Pausa temporal en actividades',
+      message: 'En este momento estamos en una pausa. Para novedades o consultas directas, puedes escribirnos por WhatsApp.',
+    },
+  };
+
+  const getPersistedSections = (): any => {
+    try {
+      if (fs.existsSync(SECTIONS_FILE)) {
+        const fileContent = fs.readFileSync(SECTIONS_FILE, 'utf8');
+        const parsed = JSON.parse(fileContent);
+        if (parsed && typeof parsed === 'object') {
+          return {
+            yoga: parsed.yoga !== false,
+            horarios: parsed.horarios !== false,
+            terapias: parsed.terapias !== false,
+            bio: parsed.bio !== false,
+            contacto: parsed.contacto !== false,
+            pauseNotice: parsed.pauseNotice || DEFAULT_SECTIONS_CONFIG.pauseNotice,
+          };
+        }
+      }
+      return DEFAULT_SECTIONS_CONFIG;
+    } catch (err) {
+      console.error('Error reading sections file. Falling back to defaults.', err);
+      return DEFAULT_SECTIONS_CONFIG;
+    }
+  };
+
+  const savePersistedSections = (sectionsData: any): boolean => {
+    try {
+      fs.writeFileSync(SECTIONS_FILE, JSON.stringify(sectionsData, null, 2), 'utf8');
+      return true;
+    } catch (err) {
+      console.error('Error writing sections file.', err);
+      return false;
+    }
+  };
+
   // --- Cloud Firestore Persistence Layer ---
   const getPersistedServicesAsync = async (): Promise<any[]> => {
     let firestoreError = false;
@@ -441,6 +488,50 @@ async function startServer() {
     return { success: true, estilos: processedEstilos };
   };
 
+  const getPersistedSectionsAsync = async (): Promise<any> => {
+    if (db) {
+      try {
+        const docRef = doc(db, 'appData', 'sectionVisibility');
+        const snap = await getDoc(docRef);
+        if (snap.exists() && snap.data()) {
+          const data = snap.data();
+          return {
+            yoga: data.yoga !== false,
+            horarios: data.horarios !== false,
+            terapias: data.terapias !== false,
+            bio: data.bio !== false,
+            contacto: data.contacto !== false,
+            pauseNotice: data.pauseNotice || DEFAULT_SECTIONS_CONFIG.pauseNotice,
+          };
+        }
+        if (!snap.exists()) {
+          const localData = getPersistedSections();
+          try {
+            await setDoc(docRef, { ...localData, updatedAt: new Date().toISOString() });
+          } catch (e) {}
+          return localData;
+        }
+      } catch (err: any) {
+        console.warn('[Firestore] Notice: getSectionVisibility falling back to disk:', err);
+      }
+    }
+    return getPersistedSections();
+  };
+
+  const savePersistedSectionsAsync = async (sectionsData: any): Promise<{ success: boolean; sections: any }> => {
+    savePersistedSections(sectionsData);
+    if (db) {
+      try {
+        const docRef = doc(db, 'appData', 'sectionVisibility');
+        await setDoc(docRef, { ...sectionsData, updatedAt: new Date().toISOString() });
+        console.log('[Firestore] Successfully synced sectionVisibility to Cloud Firestore!');
+      } catch (err: any) {
+        console.warn('[Firestore] Notice: saveSectionVisibility saved to disk:', err);
+      }
+    }
+    return { success: true, sections: sectionsData };
+  };
+
   const getPersistedBlockedSlotsAsync = async (): Promise<any[]> => {
     if (db) {
       try {
@@ -544,16 +635,21 @@ async function startServer() {
       name: s.name || 'Sin título',
       description: s.description || '',
       category: s.category || 'yoga',
-      duration: Number(s.duration) || 60,
+      duration: s.duration !== undefined && s.duration !== null ? Number(s.duration) : 60,
+      durationOptions: Array.isArray(s.durationOptions)
+        ? Array.from(new Set(s.durationOptions.map((d: any) => Number(d)).filter((d: number) => !isNaN(d) && d > 0)))
+        : undefined,
       price: Number(s.price) || 0,
       priceYoga4: s.priceYoga4 !== undefined && s.priceYoga4 !== null ? Number(s.priceYoga4) : undefined,
       priceYoga8: s.priceYoga8 !== undefined && s.priceYoga8 !== null ? Number(s.priceYoga8) : undefined,
       priceYoga8to12: s.priceYoga8to12 !== undefined && s.priceYoga8to12 !== null ? Number(s.priceYoga8to12) : undefined,
       priceYoga12: s.priceYoga12 !== undefined && s.priceYoga12 !== null ? Number(s.priceYoga12) : undefined,
+      priceYogaPaseLibre: s.priceYogaPaseLibre !== undefined && s.priceYogaPaseLibre !== null ? Number(s.priceYogaPaseLibre) : undefined,
       intensity: s.intensity || 'Suave',
       highlightNote: s.highlightNote ? String(s.highlightNote).trim() : undefined,
       backgroundImage: s.backgroundImage ? String(s.backgroundImage).trim() : undefined,
-      benefits: Array.isArray(s.benefits) ? s.benefits.filter((b: any) => typeof b === 'string' && b.trim() !== '') : []
+      benefits: Array.isArray(s.benefits) ? s.benefits.filter((b: any) => typeof b === 'string' && b.trim() !== '') : [],
+      visible: s.visible !== false
     }));
 
     const success = await savePersistedServicesAsync(cleanedServices);
@@ -749,7 +845,8 @@ async function startServer() {
       title: String(e.title || '').trim(),
       energy: String(e.energy || '').trim(),
       description: String(e.description || '').trim(),
-      image: String(e.image || '').trim()
+      image: String(e.image || '').trim(),
+      visible: e.visible !== false
     }));
 
     const result = await savePersistedEstilosAsync(cleanedEstilos);
@@ -757,6 +854,45 @@ async function startServer() {
       res.json({ success: true, estilos: result.estilos });
     } else {
       res.status(500).json({ success: false, message: 'Error al guardar estilos de práctica.' });
+    }
+  });
+
+  // API Route: Fetch section visibility settings
+  app.get('/api/section-visibility', async (req, res) => {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    const sections = await getPersistedSectionsAsync();
+    res.json({ success: true, sections });
+  });
+
+  // API Route: Update section visibility settings
+  app.post('/api/section-visibility', async (req, res) => {
+    if (!isValidAdminToken(req)) {
+      return res.status(403).json({ success: false, message: 'No autorizado. Sesión inválida o expirada.' });
+    }
+
+    const { sections } = req.body;
+    if (!sections || typeof sections !== 'object') {
+      return res.status(400).json({ success: false, message: 'Estructura de datos inválida para configuración de secciones.' });
+    }
+
+    const cleanedSections = {
+      yoga: sections.yoga !== false,
+      horarios: sections.horarios !== false,
+      terapias: sections.terapias !== false,
+      bio: sections.bio !== false,
+      contacto: sections.contacto !== false,
+      pauseNotice: sections.pauseNotice ? {
+        enabled: Boolean(sections.pauseNotice.enabled),
+        title: String(sections.pauseNotice.title || '').trim(),
+        message: String(sections.pauseNotice.message || '').trim(),
+      } : DEFAULT_SECTIONS_CONFIG.pauseNotice,
+    };
+
+    const result = await savePersistedSectionsAsync(cleanedSections);
+    if (result.success) {
+      res.json({ success: true, sections: result.sections });
+    } else {
+      res.status(500).json({ success: false, message: 'Error al guardar configuración de secciones.' });
     }
   });
 
